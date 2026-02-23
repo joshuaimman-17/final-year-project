@@ -13,8 +13,8 @@ export async function GET(req: NextRequest) {
         const posts = await sql`
             SELECT p.*, 
                    (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
-                   (CASE WHEN ${userId} IS NOT NULL THEN 
-                        EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = ${userId})
+                   (CASE WHEN ${userId}::text IS NOT NULL THEN 
+                        EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = ${userId}::text)
                     ELSE false END) as liked
             FROM community_posts p
             ORDER BY p.created_at DESC
