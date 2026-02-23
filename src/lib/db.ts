@@ -1,15 +1,14 @@
-import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
+import postgres from 'postgres';
 
-let _sql: NeonQueryFunction<false, false> | null = null;
+if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is not defined in environment variables');
+}
 
-const sql = (): NeonQueryFunction<false, false> => {
-    if (!_sql) {
-        if (!process.env.DATABASE_URL) {
-            throw new Error('DATABASE_URL is not defined in environment variables');
-        }
-        _sql = neon(process.env.DATABASE_URL);
-    }
-    return _sql;
-};
+const sql = postgres(process.env.DATABASE_URL, {
+    ssl: 'require',
+    max: 10,
+    idle_timeout: 20,
+    connect_timeout: 10,
+});
 
 export default sql;

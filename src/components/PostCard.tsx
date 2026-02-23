@@ -11,7 +11,7 @@ interface PostCardProps {
 
 export const PostCard: React.FC<PostCardProps> = ({ post }) => {
     const { user } = useAuth();
-    const [liked, setLiked] = useState(false);
+    const [liked, setLiked] = useState(post.liked || false);
     const [likeCount, setLikeCount] = useState<number>(post.likeCount || 0);
     const [showComments, setShowComments] = useState(false);
 

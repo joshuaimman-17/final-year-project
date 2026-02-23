@@ -1,21 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
-import admin from '@/lib/firebaseAdmin';
+import sql from '@/lib/db';
 import { supabaseStorage } from '@/lib/supabase';
 import { appendPostToSheet } from '@/lib/googleSheets';
 
-export async function GET() {
-    try {
-        const db = admin.firestore();
-        const postsRef = db.collection('community_posts');
-        const querySnapshot = await postsRef.orderBy('createdAt', 'desc').get();
+import { verifyAuth } from '@/lib/authHelper';
 
-        const posts = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-            createdAt: doc.data().createdAt?.toDate().toISOString()
+export async function GET(req: NextRequest) {
+    try {
+        const decodedToken = await verifyAuth(req);
+        const userId = decodedToken?.uid || null;
+
+        const posts = await sql`
+            SELECT p.*, 
+                   (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
+                   (CASE WHEN ${userId} IS NOT NULL THEN 
+                        EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = ${userId})
+                    ELSE false END) as liked
+            FROM community_posts p
+            ORDER BY p.created_at DESC
+        `;
+
+        const formattedPosts = posts.map(post => ({
+            id: post.id,
+            authorId: post.author_id,
+            authorName: post.author_name,
+            authorAvatar: post.author_avatar,
+            content: post.content,
+            imageUrl: post.image_url,
+            storagePath: post.storage_path,
+            likeCount: parseInt(post.like_count),
+            commentCount: post.comment_count,
+            liked: post.liked,
+            createdAt: post.created_at
         }));
 
-        return NextResponse.json(posts);
+        return NextResponse.json(formattedPosts);
     } catch (error: any) {
         console.error('Fetch Community Posts Error:', error);
         return NextResponse.json({ message: error.message }, { status: 500 });
@@ -45,29 +64,22 @@ export async function POST(req: NextRequest) {
             storagePath = uploadData.path;
         }
 
-        const postData = {
-            authorId,
-            authorName,
-            authorAvatar,
-            content,
-            imageUrl,
-            storagePath,
-            likeCount: 0,
-            commentCount: 0,
-            createdAt: admin.firestore.Timestamp.now(),
-        };
+        const [newPost] = await sql`
+            INSERT INTO community_posts (
+                author_id, author_name, author_avatar, content, image_url, storage_path
+            ) VALUES (
+                ${authorId}, ${authorName}, ${authorAvatar}, ${content}, ${imageUrl}, ${storagePath}
+            )
+            RETURNING *
+        `;
 
-        // 1. Save to Firestore
-        const db = admin.firestore();
-        const docRef = await db.collection('community_posts').add(postData);
-
-        // 2. Mirror to Google Sheets (Async)
-        appendPostToSheet(docRef.id, authorName, content, imageUrl);
+        // Mirror to Google Sheets (Async)
+        appendPostToSheet(newPost.id, authorName, content, imageUrl);
 
         return NextResponse.json({
-            id: docRef.id,
-            ...postData,
-            createdAt: postData.createdAt.toDate().toISOString()
+            ...newPost,
+            id: newPost.id,
+            createdAt: newPost.created_at
         }, { status: 201 });
 
     } catch (error: any) {
