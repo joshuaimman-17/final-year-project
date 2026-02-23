@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import admin from '@/lib/firebaseAdmin';
 import sql from '@/lib/db';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
@@ -18,12 +20,15 @@ export async function GET(req: NextRequest) {
         }
 
         const db = admin.firestore();
+        console.log(`Fetching comments for post: ${postId}, parent: ${parentId}`);
+
         let query: admin.firestore.Query = db.collection('community_comments')
             .where('postId', '==', postId)
             .where('parentId', '==', parentId)
             .orderBy('createdAt', 'asc');
 
         const querySnapshot = await query.get();
+        console.log(`Found ${querySnapshot.size} comments`);
         const comments = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
