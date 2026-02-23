@@ -8,6 +8,7 @@ import { CreatePostModal } from '@/components/CreatePostModal';
 import { Icon } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import { auth } from '@/lib/firebase';
 
 function CommunityContent() {
     const { user } = useAuth();
@@ -17,7 +18,10 @@ function CommunityContent() {
 
     const fetchPosts = async () => {
         try {
-            const res = await fetch('/api/community/posts');
+            const token = await auth.currentUser?.getIdToken();
+            const res = await fetch('/api/community/posts', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             const data = await res.json();
             setPosts(data);
         } catch (error) {

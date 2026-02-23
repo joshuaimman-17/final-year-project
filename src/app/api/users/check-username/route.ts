@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sql from '@/lib/db';
+import neonSql from '@/lib/neon';
 
 export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
@@ -10,12 +10,13 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const results = await sql`
+        const results = await neonSql`
             SELECT id FROM users WHERE username = ${username}
         `;
 
         return NextResponse.json({ available: results.length === 0 });
     } catch (error: any) {
+        console.error('Check Username Error (Neon):', error);
         return NextResponse.json({ message: error.message }, { status: 500 });
     }
 }

@@ -1,40 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sql from '@/lib/db';
+import admin from '@/lib/firebaseAdmin';
 import { supabaseStorage } from '@/lib/supabase';
+import { verifyAuth } from '@/lib/authHelper';
 
 export const dynamic = 'force-dynamic';
-import { appendPostToSheet } from '@/lib/googleSheets';
-
-import { verifyAuth } from '@/lib/authHelper';
 
 export async function GET(req: NextRequest) {
     try {
         const decodedToken = await verifyAuth(req);
-        const userId = decodedToken?.uid || null;
+        const userId = (decodedToken?.phone_number || decodedToken?.uid || null) as string | null;
 
-        const posts = await sql`
-            SELECT p.*, 
-                   (SELECT COUNT(*) FROM post_likes WHERE post_id = p.id) as like_count,
-                   (CASE WHEN ${userId}::text IS NOT NULL THEN 
-                        EXISTS(SELECT 1 FROM post_likes WHERE post_id = p.id AND user_id = ${userId}::text)
-                    ELSE false END) as liked
-            FROM community_posts p
-            ORDER BY p.created_at DESC
-        `;
+        const db = admin.firestore();
+        const postsSnap = await db.collection('community_posts').orderBy('createdAt', 'desc').get();
 
-        const formattedPosts = posts.map(post => ({
-            id: post.id,
-            authorId: post.author_id,
-            authorName: post.author_name,
-            authorAvatar: post.author_avatar,
-            content: post.content,
-            imageUrl: post.image_url,
-            storagePath: post.storage_path,
-            likeCount: parseInt(post.like_count),
-            commentCount: post.comment_count,
-            liked: post.liked,
-            createdAt: post.created_at
-        }));
+        const formattedPosts = postsSnap.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                authorId: data.authorId,
+                authorName: data.authorName,
+                authorAvatar: data.authorAvatar,
+                content: data.content,
+                imageUrl: data.imageUrl,
+                storagePath: data.storagePath,
+                likeCount: data.likeCount || 0,
+                commentCount: data.commentCount || 0,
+                liked: false, // Liked logic will need a separate check if required
+                createdAt: data.createdAt?.toDate() || new Date()
+            };
+        });
 
         return NextResponse.json(formattedPosts);
     } catch (error: any) {
@@ -66,36 +60,23 @@ export async function POST(req: NextRequest) {
             storagePath = uploadData.path;
         }
 
-        // --- LAZY USER SYNC ---
-        // Ensure user exists in Postgres to satisfy foreign key constraint
-        const decodedToken = await verifyAuth(req);
-        const email = decodedToken?.email || '';
+        const db = admin.firestore();
+        const postData = {
+            authorId,
+            authorName,
+            authorAvatar,
+            content,
+            imageUrl,
+            storagePath,
+            likeCount: 0,
+            commentCount: 0,
+            createdAt: admin.firestore.FieldValue.serverTimestamp()
+        };
 
-        await sql`
-            INSERT INTO users (id, email, username, full_name, avatar_url)
-            VALUES (${authorId}, ${email}, ${authorName || email.split('@')[0]}, ${authorName}, ${authorAvatar})
-            ON CONFLICT (id) DO UPDATE SET
-                full_name = EXCLUDED.full_name,
-                avatar_url = EXCLUDED.avatar_url
-        `;
+        const docRef = await db.collection('community_posts').add(postData);
+        const newPost = { id: docRef.id, ...postData, createdAt: new Date() };
 
-        const [newPost] = await sql`
-            INSERT INTO community_posts (
-                author_id, author_name, author_avatar, content, image_url, storage_path
-            ) VALUES (
-                ${authorId}, ${authorName}, ${authorAvatar}, ${content}, ${imageUrl}, ${storagePath}
-            )
-            RETURNING *
-        `;
-
-        // Mirror to Google Sheets (Async)
-        appendPostToSheet(newPost.id, authorName, content, imageUrl);
-
-        return NextResponse.json({
-            ...newPost,
-            id: newPost.id,
-            createdAt: newPost.created_at
-        }, { status: 201 });
+        return NextResponse.json(newPost, { status: 201 });
 
     } catch (error: any) {
         console.error('Create Community Post Error:', error);

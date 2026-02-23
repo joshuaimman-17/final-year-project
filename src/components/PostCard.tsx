@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Icon } from './Icon';
 import { useAuth } from '@/context/AuthContext';
 import { CommentSection } from '@/components/CommentSection';
+import { auth } from '@/lib/firebase';
 
 interface PostCardProps {
     post: any;
@@ -24,9 +25,13 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
         setLikeCount((prev: number) => prev + diff);
 
         try {
+            const token = await auth.currentUser?.getIdToken();
             await fetch(`/api/community/posts/${post.id}/like`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
                 body: JSON.stringify({ action: newLiked ? 'like' : 'unlike' })
             });
         } catch (error) {

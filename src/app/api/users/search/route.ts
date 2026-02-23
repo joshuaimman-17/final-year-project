@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sql from '@/lib/db';
+import neonSql from '@/lib/neon';
 import { verifyAuth } from '@/lib/authHelper';
 
 export async function GET(req: NextRequest) {
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const users = await sql`
+        const users = await neonSql`
             SELECT id, username, full_name, avatar_url, role 
             FROM users 
             WHERE username ILIKE ${'%' + query + '%'}
@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
 
         return NextResponse.json({ users });
     } catch (error: any) {
+        console.error('User Search Error (Neon):', error);
         return NextResponse.json({ message: error.message }, { status: 500 });
     }
 }

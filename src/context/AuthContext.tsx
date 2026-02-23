@@ -11,11 +11,9 @@ import {
     sendPasswordResetEmail,
     updateProfile,
     RecaptchaVerifier,
-    signInWithPhoneNumber,
-    ConfirmationResult
+    signInWithPhoneNumber
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { auth, googleProvider, db } from '@/lib/firebase';
+import { auth, googleProvider } from '@/lib/firebase';
 import logger from '@/lib/logger';
 
 interface AuthContextType {
@@ -80,37 +78,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             logger.debug(`Auth state changed: ${fbUser ? fbUser.email : 'No user'}`);
             if (fbUser) {
-                // Try to get data from Firestore
-                let extra: any = {};
-                const idForDb = fbUser.phoneNumber || fbUser.uid; // Prioritize phone number as ID
+                const idForDb = fbUser.phoneNumber || fbUser.uid;
 
                 try {
-                    const userDoc = await getDoc(doc(db, "users", idForDb));
-                    if (userDoc.exists()) {
-                        extra = userDoc.data();
-                        logger.debug("Fetched user profile from Firestore", extra);
-                        localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify(extra));
+                    // Fetch user profile from Postgres via sync API
+                    const token = await fbUser.getIdToken();
+                    const res = await fetch('/api/auth/sync', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (res.ok) {
+                        const profile = await res.json();
+                        setUser({
+                            id: profile.id,
+                            username: profile.username || fbUser.email?.split('@')[0] || profile.id,
+                            full_name: profile.full_name || fbUser.displayName || 'Agri User',
+                            role: profile.role || 'CUSTOMER',
+                            farm_name: profile.farm_name || 'My Farm',
+                            latitude: profile.latitude || 36.7783,
+                            longitude: profile.longitude || -119.4179,
+                            avatarUrl: profile.avatar_url || fbUser.photoURL || undefined,
+                            phoneNumber: profile.id
+                        });
+                        localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify(profile));
                     } else {
+                        // Fallback to local storage if API fails
                         const stored = localStorage.getItem(`${USER_DATA_KEY}_${idForDb}`);
-                        extra = stored ? JSON.parse(stored) : {};
+                        const extra = stored ? JSON.parse(stored) : {};
+                        setUser({
+                            id: idForDb,
+                            username: extra.username || fbUser.email?.split('@')[0] || fbUser.phoneNumber || 'User',
+                            full_name: fbUser.displayName || extra.full_name || 'Agri User',
+                            role: extra.role || 'CUSTOMER',
+                            farm_name: extra.farm_name || 'My Farm',
+                            latitude: extra.latitude || 36.7783,
+                            longitude: extra.longitude || -119.4179,
+                            avatarUrl: fbUser.photoURL || undefined,
+                            phoneNumber: fbUser.phoneNumber || extra.phoneNumber || undefined
+                        });
                     }
                 } catch (error) {
-                    logger.error("Error fetching user data from Firestore", error);
+                    logger.error("Error syncing profile from Postgres", error);
                     const stored = localStorage.getItem(`${USER_DATA_KEY}_${idForDb}`);
-                    extra = stored ? JSON.parse(stored) : {};
+                    const extra = stored ? JSON.parse(stored) : {};
+                    setUser({
+                        id: idForDb,
+                        username: extra.username || fbUser.email?.split('@')[0] || fbUser.phoneNumber || 'User',
+                        full_name: fbUser.displayName || extra.full_name || 'Agri User',
+                        role: extra.role || 'CUSTOMER',
+                        farm_name: extra.farm_name || 'My Farm',
+                        latitude: extra.latitude || 36.7783,
+                        longitude: extra.longitude || -119.4179,
+                        avatarUrl: fbUser.photoURL || undefined,
+                        phoneNumber: fbUser.phoneNumber || extra.phoneNumber || undefined
+                    });
                 }
-
-                setUser({
-                    id: idForDb,
-                    username: extra.username || fbUser.email?.split('@')[0] || fbUser.phoneNumber || 'User',
-                    full_name: fbUser.displayName || extra.full_name || 'Agri User',
-                    role: extra.role || 'CUSTOMER',
-                    farm_name: extra.farm_name || 'My Farm',
-                    latitude: extra.latitude || 36.7783,
-                    longitude: extra.longitude || -119.4179,
-                    avatarUrl: fbUser.photoURL || undefined,
-                    phoneNumber: fbUser.phoneNumber || extra.phoneNumber || undefined
-                });
             } else {
                 setUser(null);
             }
@@ -127,8 +149,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             logger.info("Firebase User created successfully", { uid: res.user.uid });
             await updateProfile(res.user, { displayName: name });
 
-            const idForDb = phoneNumber; // Use phone number as primary ID
-
+            const idForDb = phoneNumber;
             const userData = {
                 id: idForDb,
                 uid: res.user.uid,
@@ -144,13 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             };
 
             localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify(userData));
-
-            try {
-                await setDoc(doc(db, "users", idForDb), userData);
-                logger.debug("User profile saved to Firestore");
-            } catch (firestoreError) {
-                logger.error("Firestore write failed during signup", firestoreError);
-            }
+            // Note: Postgres sync happens automatically via the onAuthStateChanged effect
         } catch (error: any) {
             logger.error("Signup failed", error);
             throw new Error(getAuthErrorMessage(error));
@@ -170,30 +185,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const loginWithGoogle = async () => {
         try {
-            const res = await signInWithPopup(auth, googleProvider);
-
-            try {
-                const userDoc = await getDoc(doc(db, "users", res.user.uid));
-
-                if (!userDoc.exists()) {
-                    const userData = {
-                        uid: res.user.uid,
-                        full_name: res.user.displayName,
-                        email: res.user.email,
-                        farm_name: "My Farm",
-                        role: 'FARMER',
-                        latitude: 36.7783,
-                        longitude: -119.4179,
-                        createdAt: new Date().toISOString(),
-                        phoneNumber: res.user.phoneNumber || null,
-                        avatarUrl: res.user.photoURL
-                    };
-                    await setDoc(doc(db, "users", res.user.uid), userData);
-                    localStorage.setItem(`${USER_DATA_KEY}_${res.user.uid}`, JSON.stringify(userData));
-                }
-            } catch (firestoreError) {
-                console.error("Firestore sync failed during Google login (user still authenticated):", firestoreError);
-            }
+            await signInWithPopup(auth, googleProvider);
+            // Sync handled by listener
         } catch (error: any) {
             throw new Error(getAuthErrorMessage(error));
         }
@@ -203,38 +196,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
     };
 
-    const confirmPhoneSignup = async (confirmationResult: any, otp: string, name: string, farm: string) => {
-        const res = await confirmationResult.confirm(otp);
-        const user = res.user;
+    const confirmPhoneSignup = async (confirmationResult: any, otp: string, name: string, farm: string, username: string, role: string) => {
+        try {
+            const res = await confirmationResult.confirm(otp);
+            const fbUser = res.user;
+            await updateProfile(fbUser, { displayName: name });
 
-        // Check if user exists, if not create
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (!userDoc.exists()) {
-            await updateProfile(user, { displayName: name });
             const userData = {
-                uid: user.uid,
+                id: fbUser.phoneNumber || fbUser.uid,
+                username,
                 full_name: name,
-                email: null, // Phone auth might not have email
                 farm_name: farm,
-                role: 'FARMER',
-                latitude: 36.7783,
-                longitude: -119.4179,
-                createdAt: new Date().toISOString(),
-                phoneNumber: user.phoneNumber
+                role,
+                createdAt: new Date().toISOString()
             };
-            await setDoc(doc(db, "users", user.uid), userData);
-            localStorage.setItem(`${USER_DATA_KEY}_${user.uid}`, JSON.stringify(userData));
+            localStorage.setItem(`${USER_DATA_KEY}_${userData.id}`, JSON.stringify(userData));
+        } catch (error: any) {
+            throw new Error(getAuthErrorMessage(error));
         }
     };
 
     const setUpRecaptcha = (elementId: string) => {
-        const recaptchaVerifier = new RecaptchaVerifier(auth, elementId, {
-            'size': 'invisible',
-            'callback': (response: any) => {
-                // reCAPTCHA solved, allow signInWithPhoneNumber.
-            }
+        return new RecaptchaVerifier(auth, elementId, {
+            'size': 'invisible'
         });
-        return recaptchaVerifier;
     };
 
     const logout = async () => {
@@ -250,7 +235,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const fbUser = auth.currentUser;
         if (!currentUser || !fbUser) return;
 
-        // Only update if location actually changed (avoid infinite re-renders)
         if (
             Math.abs(currentUser.latitude - lat) < 0.0001 &&
             Math.abs(currentUser.longitude - lon) < 0.0001
@@ -259,40 +243,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const updated = { ...currentUser, latitude: lat, longitude: lon };
         setUser(updated);
 
-        // Persist to localStorage
-        const stored = localStorage.getItem(`${USER_DATA_KEY}_${fbUser.uid}`);
+        const idForDb = fbUser.phoneNumber || fbUser.uid;
+        const stored = localStorage.getItem(`${USER_DATA_KEY}_${idForDb}`);
         const extra = stored ? JSON.parse(stored) : {};
-        localStorage.setItem(`${USER_DATA_KEY}_${fbUser.uid}`, JSON.stringify({ ...extra, latitude: lat, longitude: lon }));
+        localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify({ ...extra, latitude: lat, longitude: lon }));
 
-        // Persist to Firestore (non-blocking)
-        setDoc(doc(db, "users", fbUser.uid), { latitude: lat, longitude: lon }, { merge: true })
-            .catch((err) => console.error("Firestore location update failed:", err));
+        // TODO: Push to Postgres
     }, []);
 
-    // Auto-detect and continuously watch GPS location
     useEffect(() => {
         if (!user || typeof window === 'undefined' || !navigator.geolocation) return;
-
-        // Only start watching once per session
         if (watchIdRef.current !== null) return;
 
         setLocationLoading(true);
-
         watchIdRef.current = navigator.geolocation.watchPosition(
             (pos) => {
                 const { latitude, longitude } = pos.coords;
                 updateLocation(latitude, longitude);
                 setLocationLoading(false);
             },
-            (err) => {
-                console.error("GPS watch error:", err);
-                setLocationLoading(false);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 30000 // Cache for 30s to avoid excessive updates
-            }
+            () => setLocationLoading(false),
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
         );
 
         return () => {
@@ -311,10 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 updateLocation(pos.coords.latitude, pos.coords.longitude);
                 setLocationLoading(false);
             },
-            (err) => {
-                console.error("Location detection failed:", err);
-                setLocationLoading(false);
-            },
+            () => setLocationLoading(false),
             { enableHighAccuracy: true, timeout: 10000 }
         );
     };

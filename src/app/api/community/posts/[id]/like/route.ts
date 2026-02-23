@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sql from '@/lib/db';
+import admin from '@/lib/firebaseAdmin';
 import { verifyAuth } from '@/lib/authHelper';
 
 export async function POST(
@@ -11,70 +11,44 @@ export async function POST(
     if (!decodedToken) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
-    const userId = decodedToken.uid;
+    const userId = decodedToken.phone_number || decodedToken.uid;
 
     try {
-        // Toggle Like logic in a transaction
-        const result = await sql.begin(async (tx: any) => {
-            // Check if like exists
-            const existingLikes = await tx`
-                SELECT * FROM post_likes 
-                WHERE post_id = ${postId} AND user_id = ${userId}
-            `;
+        const db = admin.firestore();
+        const likeId = `${postId}_${userId}`;
+        const likeRef = db.collection('post_likes').doc(likeId);
+        const postRef = db.collection('community_posts').doc(postId);
 
-            if (existingLikes.length > 0) {
-                // Unlike: Remove entry and decrement count
-                await tx`
-                    DELETE FROM post_likes 
-                    WHERE post_id = ${postId} AND user_id = ${userId}
-                `;
+        const result = await db.runTransaction(async (transaction) => {
+            const likeDoc = await transaction.get(likeRef);
+            const postDoc = await transaction.get(postRef);
 
-                const [updatedPost] = await tx`
-                    UPDATE community_posts 
-                    SET like_count = GREATEST(0, like_count - 1) 
-                    WHERE id = ${postId}
-                    RETURNING like_count
-                `;
+            if (!postDoc.exists) {
+                throw new Error("Post does not exist");
+            }
 
-                return { liked: false, likeCount: updatedPost.like_count };
+            if (likeDoc.exists) {
+                // Unlike
+                transaction.delete(likeRef);
+                const newCount = Math.max(0, (postDoc.data()?.likeCount || 0) - 1);
+                transaction.update(postRef, { likeCount: newCount });
+                return { liked: false, likeCount: newCount };
             } else {
-                // Like: Add entry and increment count
-                await tx`
-                    INSERT INTO post_likes (post_id, user_id) 
-                    VALUES (${postId}, ${userId})
-                `;
-
-                const [updatedPost] = await tx`
-                    UPDATE community_posts 
-                    SET like_count = like_count + 1 
-                    WHERE id = ${postId}
-                    RETURNING like_count
-                `;
-
-                return { liked: true, likeCount: updatedPost.like_count };
+                // Like
+                transaction.set(likeRef, {
+                    postId,
+                    userId,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                const newCount = (postDoc.data()?.likeCount || 0) + 1;
+                transaction.update(postRef, { likeCount: newCount });
+                return { liked: true, likeCount: newCount };
             }
         });
 
-        if (result.liked) {
-            // Trigger push notification to post author (don't notify oneself)
-            try {
-                const [post] = await sql`SELECT author_id, author_name FROM community_posts WHERE id = ${postId}`;
-                if (post && post.author_id !== userId) {
-                    const { sendPushNotification } = require('@/lib/notifications');
-                    sendPushNotification(
-                        post.author_id,
-                        "New Like! ❤️",
-                        `${decodedToken.name || "Someone"} liked your post in the community.`
-                    );
-                }
-            } catch (notifyError) {
-                console.error('Failed to trigger post like notification:', notifyError);
-            }
-        }
-
         return NextResponse.json(result);
     } catch (error: any) {
-        console.error('Like Toggle Error:', error);
+        console.error('Like Toggle Error (Firestore):', error);
         return NextResponse.json({ message: error.message }, { status: 500 });
     }
 }

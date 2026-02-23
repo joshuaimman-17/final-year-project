@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- 2. Community Posts Table
 CREATE TABLE IF NOT EXISTS community_posts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text, -- Supports both Postgres UUIDs and legacy Firestore IDs
     author_id TEXT REFERENCES users(id) ON DELETE CASCADE,
     author_name TEXT,
     author_avatar TEXT,
@@ -36,21 +36,33 @@ CREATE TABLE IF NOT EXISTS community_posts (
 
 -- 3. Post Likes Table
 CREATE TABLE IF NOT EXISTS post_likes (
-    post_id UUID REFERENCES community_posts(id) ON DELETE CASCADE,
+    post_id TEXT REFERENCES community_posts(id) ON DELETE CASCADE,
     user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     PRIMARY KEY (post_id, user_id)
 );
 
--- 4. Comment Likes Table
+-- 4. Community Comments Table (Postgres Unified)
+CREATE TABLE IF NOT EXISTS community_comments (
+    id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text, -- Firestore ID or gen_random_uuid()::text
+    post_id TEXT REFERENCES community_posts(id) ON DELETE CASCADE,
+    parent_id TEXT, -- For replies
+    author_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    author_name TEXT,
+    author_avatar TEXT,
+    text TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 5. Comment Likes Table
 CREATE TABLE IF NOT EXISTS comment_likes (
-    comment_id TEXT, -- Firestore ID
+    comment_id TEXT REFERENCES community_comments(id) ON DELETE CASCADE,
     user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     PRIMARY KEY (comment_id, user_id)
 );
 
--- 5. FCM Tokens Table
+-- 6. FCM Tokens Table
 CREATE TABLE IF NOT EXISTS fcm_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
@@ -60,7 +72,7 @@ CREATE TABLE IF NOT EXISTS fcm_tokens (
     UNIQUE(user_id, token)
 );
 
--- 6. Chat Service (Neon Database)
+-- 7. Chat Service (Neon Database)
 CREATE TABLE IF NOT EXISTS user_public_keys (
     user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     public_key TEXT NOT NULL, -- Base64 encoded RSA public key
@@ -79,6 +91,8 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 CREATE INDEX IF NOT EXISTS idx_posts_author ON community_posts(author_id);
 CREATE INDEX IF NOT EXISTS idx_likes_post ON post_likes(post_id);
 CREATE INDEX IF NOT EXISTS idx_likes_user ON post_likes(user_id);
+CREATE INDEX IF NOT EXISTS idx_comments_post ON community_comments(post_id);
+CREATE INDEX IF NOT EXISTS idx_comments_parent ON community_comments(parent_id);
 CREATE INDEX IF NOT EXISTS idx_likes_comment ON comment_likes(comment_id);
 CREATE INDEX IF NOT EXISTS idx_fcm_user ON fcm_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sender ON chat_messages(sender_id);

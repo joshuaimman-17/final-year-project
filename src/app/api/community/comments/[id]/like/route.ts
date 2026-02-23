@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sql from '@/lib/db';
+import admin from '@/lib/firebaseAdmin';
 import { verifyAuth } from '@/lib/authHelper';
 
 export const dynamic = 'force-dynamic';
@@ -16,45 +16,47 @@ export async function POST(
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
 
-        const userId = decodedToken.uid;
-        const { action } = await req.json(); // 'like' or 'unlike'
+        const userId = decodedToken.phone_number || decodedToken.uid;
+        const body = await req.json();
+        const action = body.action || (body.liked ? 'unlike' : 'like'); // Handle various client formats
 
-        if (action === 'like') {
-            await sql`
-                INSERT INTO comment_likes (comment_id, user_id)
-                VALUES (${commentId}, ${userId})
-                ON CONFLICT (comment_id, user_id) DO NOTHING
-            `;
-        } else {
-            await sql`
-                DELETE FROM comment_likes
-                WHERE comment_id = ${commentId} AND user_id = ${userId}
-            `;
-        }
+        const db = admin.firestore();
+        const likeId = `${commentId}_${userId}`;
+        const likeRef = db.collection('comment_likes').doc(likeId);
+        const commentRef = db.collection('community_comments').doc(commentId);
 
-        if (action === 'like') {
-            try {
-                const admin = require('@/lib/firebaseAdmin').default;
-                const doc = await admin.firestore().collection('community_comments').doc(commentId).get();
-                if (doc.exists) {
-                    const comment = doc.data();
-                    if (comment.authorId !== userId) {
-                        const { sendPushNotification } = require('@/lib/notifications');
-                        sendPushNotification(
-                            comment.authorId,
-                            "Comment Liked! ❤️",
-                            `${decodedToken.name || "Someone"} liked your comment: "${comment.text.substring(0, 30)}..."`
-                        );
-                    }
-                }
-            } catch (notifyError) {
-                console.error('Failed to trigger comment like notification:', notifyError);
+        const result = await db.runTransaction(async (transaction) => {
+            const likeDoc = await transaction.get(likeRef);
+            const commentDoc = await transaction.get(commentRef);
+
+            if (!commentDoc.exists) {
+                throw new Error("Comment does not exist");
             }
-        }
 
-        return NextResponse.json({ success: true });
+            if (likeDoc.exists || action === 'unlike') {
+                if (!likeDoc.exists && action === 'unlike') return { success: true, liked: false };
+
+                // Unlike
+                transaction.delete(likeRef);
+                const newCount = Math.max(0, (commentDoc.data()?.likeCount || 0) - 1);
+                transaction.update(commentRef, { likeCount: newCount });
+                return { success: true, liked: false, likeCount: newCount };
+            } else {
+                // Like
+                transaction.set(likeRef, {
+                    commentId,
+                    userId,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp()
+                });
+                const newCount = (commentDoc.data()?.likeCount || 0) + 1;
+                transaction.update(commentRef, { likeCount: newCount });
+                return { success: true, liked: true, likeCount: newCount };
+            }
+        });
+
+        return NextResponse.json(result);
     } catch (error: any) {
-        console.error('Comment Like Error:', error);
+        console.error('Comment Like Error (Firestore):', error);
         return NextResponse.json({ message: error.message }, { status: 500 });
     }
 }

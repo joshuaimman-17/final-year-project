@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sql from '@/lib/db';
+import neonSql from '@/lib/neon';
 import { verifyAuth } from '@/lib/authHelper';
 
 export async function POST(req: NextRequest) {
@@ -22,24 +22,25 @@ export async function POST(req: NextRequest) {
         const username = body.username || null;
         const role = body.role || 'CUSTOMER';
 
-        // Check if user exists
-        const [existingUser] = await sql`SELECT * FROM users WHERE id = ${userId}`;
+        // Check if user exists in Neon
+        const existingUsers = await neonSql`SELECT * FROM users WHERE id = ${userId}`;
+        const existingUser = existingUsers[0];
 
         if (existingUser) {
             try {
-                // Update existing user info
-                const updatedUser = await sql`
+                // Update existing user info in Neon
+                const updatedUsers = await neonSql`
                     UPDATE users 
                     SET 
-                        full_name = COALESCE(${full_name}::text, full_name),
-                        username = COALESCE(${username}::text, username),
-                        farm_name = COALESCE(${farm_name}::text, farm_name),
-                        location = COALESCE(${location}::text, location),
-                        avatar_url = COALESCE(${avatar_url}::text, avatar_url)
+                        full_name = COALESCE(${full_name}, full_name),
+                        username = COALESCE(${username}, username),
+                        farm_name = COALESCE(${farm_name}, farm_name),
+                        location = COALESCE(${location}, location),
+                        avatar_url = COALESCE(${avatar_url}, avatar_url)
                     WHERE id = ${userId}
                     RETURNING *
                 `;
-                return NextResponse.json({ user: updatedUser[0], message: 'User synced (updated)' });
+                return NextResponse.json({ user: updatedUsers[0], message: 'User synced (updated) in Neon' });
             } catch (updateErr: any) {
                 if (updateErr.code === '23505') { // Unique constraint violation
                     return NextResponse.json({ message: 'Username already taken' }, { status: 409 });
@@ -48,27 +49,27 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Create new user record
+        // Create new user record in Neon
         if (!username) {
             return NextResponse.json({ message: 'Username is required for new accounts' }, { status: 400 });
         }
 
         try {
-            const newUser = await sql`
+            const newUsers = await neonSql`
                 INSERT INTO users (id, email, username, full_name, role, farm_name, location, avatar_url)
                 VALUES (
                     ${userId}, 
-                    ${email || null}::text, 
-                    ${username}::text, 
-                    ${full_name || name || 'Agri User'}::text, 
-                    ${role}::text,
-                    ${farm_name || 'My Farm'}::text, 
-                    ${location || ''}::text, 
-                    ${avatar_url || ''}::text
+                    ${email || null}, 
+                    ${username}, 
+                    ${full_name || name || 'Agri User'}, 
+                    ${role},
+                    ${farm_name || 'My Farm'}, 
+                    ${location || ''}, 
+                    ${avatar_url || ''}
                 )
                 RETURNING *
             `;
-            return NextResponse.json({ user: newUser[0], message: 'User synced (created)' }, { status: 201 });
+            return NextResponse.json({ user: newUsers[0], message: 'User synced (created) in Neon' }, { status: 201 });
         } catch (createErr: any) {
             if (createErr.code === '23505') {
                 return NextResponse.json({ message: 'Username already taken' }, { status: 409 });
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
             throw createErr;
         }
     } catch (err: any) {
-        console.error('Sync Error:', err);
+        console.error('Sync Error (Neon):', err);
         return NextResponse.json({ message: err.message }, { status: 500 });
     }
 }

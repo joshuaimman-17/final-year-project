@@ -4,7 +4,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "YOUR_API_KEY",
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyD36yBakgS3VCxZB9-F5td59mBXVI72C-s",
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "dr-plant-5bbbe.firebaseapp.com",
     projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "dr-plant-5bbbe",
     storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "dr-plant-5bbbe.firebasestorage.app",
