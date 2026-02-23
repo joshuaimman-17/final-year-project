@@ -36,6 +36,13 @@ yarn-error.log*
 # vercel
 .vercel
 
+# Firebase sensitive files
+serviceAccountKey.json
+firebase-debug.log
+upload_test_v3_result.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+.vercel
