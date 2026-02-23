@@ -55,6 +55,23 @@ export async function POST(
             }
         });
 
+        if (result.liked) {
+            // Trigger push notification to post author (don't notify oneself)
+            try {
+                const [post] = await sql`SELECT author_id, author_name FROM community_posts WHERE id = ${postId}`;
+                if (post && post.author_id !== userId) {
+                    const { sendPushNotification } = require('@/lib/notifications');
+                    sendPushNotification(
+                        post.author_id,
+                        "New Like! ❤️",
+                        `${decodedToken.name || "Someone"} liked your post in the community.`
+                    );
+                }
+            } catch (notifyError) {
+                console.error('Failed to trigger post like notification:', notifyError);
+            }
+        }
+
         return NextResponse.json(result);
     } catch (error: any) {
         console.error('Like Toggle Error:', error);

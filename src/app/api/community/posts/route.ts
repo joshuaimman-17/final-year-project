@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import sql from '@/lib/db';
 import { supabaseStorage } from '@/lib/supabase';
+
+export const dynamic = 'force-dynamic';
 import { appendPostToSheet } from '@/lib/googleSheets';
 
 import { verifyAuth } from '@/lib/authHelper';

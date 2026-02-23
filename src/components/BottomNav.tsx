@@ -33,7 +33,9 @@ export const BottomNav: React.FC = () => {
                 <NavItem path="/community" icon="groups" label="Feed" />
                 <NavItem path="/field" icon="landscape" label="Field" />
                 <NavItem path="/marketplace" icon="storefront" label="Market" />
+                <NavItem path="/chat" icon="chat" label="Chat" />
                 <NavItem path="/profile" icon="person" label="Profile" />
+
             </div>
         </nav>
     );

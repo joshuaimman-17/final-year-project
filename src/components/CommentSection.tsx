@@ -13,6 +13,8 @@ interface Comment {
     authorAvatar: string;
     text: string;
     createdAt: string;
+    likeCount: number;
+    liked: boolean;
 }
 
 interface CommentSectionProps {
@@ -34,8 +36,17 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
         try {
             const url = `/api/community/comments?postId=${postId}${parentId ? `&parentId=${parentId}` : '&parentId=null'}`;
             const res = await fetch(url);
+            if (!res.ok) {
+                const errorData = await res.json();
+                console.error('API Error:', errorData.message);
+                return;
+            }
             const data = await res.json();
-            setComments(data);
+            if (Array.isArray(data)) {
+                setComments(data);
+            } else {
+                console.error('Expected array of comments, got:', data);
+            }
         } catch (error) {
             console.error('Failed to fetch comments:', error);
         } finally {
@@ -46,6 +57,37 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
     useEffect(() => {
         fetchComments();
     }, [postId, parentId, refreshKey]);
+
+    const handleLikeComment = async (comment: Comment) => {
+        if (!user) return;
+
+        const newLiked = !comment.liked;
+        const diff = newLiked ? 1 : -1;
+
+        // Optimistic UI update
+        setComments(prev => prev.map(c =>
+            c.id === comment.id
+                ? { ...c, liked: newLiked, likeCount: Math.max(0, (c.likeCount || 0) + diff) }
+                : c
+        ));
+
+        try {
+            const res = await fetch(`/api/community/comments/${comment.id}/like`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: newLiked ? 'like' : 'unlike' })
+            });
+            if (!res.ok) throw new Error('Failed to toggle like');
+        } catch (error) {
+            console.error('Like error:', error);
+            // Revert on error
+            setComments(prev => prev.map(c =>
+                c.id === comment.id
+                    ? { ...c, liked: !newLiked, likeCount: Math.max(0, (c.likeCount || 0) - diff) }
+                    : c
+            ));
+        }
+    };
 
     const handleSubmit = async (e: React.FormEvent, customParentId: string | null = null) => {
         e.preventDefault();
@@ -135,6 +177,14 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
                                 </div>
 
                                 <div className="d-flex gap-3 mt-1 ps-1">
+                                    <button
+                                        onClick={() => handleLikeComment(comment)}
+                                        className={`btn btn-link p-0 text-decoration-none d-flex align-items-center gap-1 ${comment.liked ? 'text-danger' : 'text-muted'}`}
+                                        style={{ fontSize: '11px' }}
+                                    >
+                                        <Icon name="favorite" filled={comment.liked} style={{ fontSize: '12px' }} />
+                                        <span>{comment.likeCount || 0}</span>
+                                    </button>
                                     <button
                                         onClick={() => setReplyingTo(replyingTo === comment.id ? null : comment.id)}
                                         className="btn btn-link p-0 text-decoration-none text-muted"

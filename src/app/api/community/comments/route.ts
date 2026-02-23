@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import admin from '@/lib/firebaseAdmin';
 import sql from '@/lib/db';
+import { verifyAuth } from '@/lib/authHelper';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
         let parentId = searchParams.get('parentId');
 
         // Handle string representation of null from client
-        if (parentId === 'null' || !parentId) {
+        if (parentId === 'null' || parentId === '' || !parentId) {
             parentId = null;
         }
 
@@ -28,12 +29,41 @@ export async function GET(req: NextRequest) {
             .orderBy('createdAt', 'asc');
 
         const querySnapshot = await query.get();
-        console.log(`Found ${querySnapshot.size} comments`);
-        const comments = querySnapshot.docs.map(doc => ({
+        const firestoreComments = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data(),
             createdAt: doc.data().createdAt?.toDate().toISOString()
-        }));
+        })) as any[];
+
+        if (firestoreComments.length === 0) {
+            return NextResponse.json([]);
+        }
+
+        // 2. Fetch like data from Postgres for these comments
+        const decodedToken = await verifyAuth(req);
+        const userId = decodedToken?.uid || null;
+        const commentIds = firestoreComments.map(c => c.id);
+
+        const likesData = await sql`
+            SELECT comment_id,
+                   COUNT(*) as like_count,
+                   (CASE WHEN ${userId}::text IS NOT NULL THEN
+                        EXISTS(SELECT 1 FROM comment_likes WHERE comment_id = cl.comment_id AND user_id = ${userId}::text)
+                    ELSE false END) as liked
+            FROM comment_likes cl
+            WHERE comment_id = ANY(${commentIds})
+            GROUP BY comment_id
+        `;
+
+        // 3. Merge data
+        const comments = firestoreComments.map(comment => {
+            const likeInfo = likesData.find(l => l.comment_id === comment.id);
+            return {
+                ...comment,
+                likeCount: parseInt(likeInfo?.like_count || '0'),
+                liked: likeInfo?.liked || false
+            };
+        });
 
         return NextResponse.json(comments);
     } catch (error: any) {
@@ -76,6 +106,37 @@ export async function POST(req: NextRequest) {
         } catch (sqlError) {
             console.error('Failed to sync comment count to Postgres:', sqlError);
             // We don't fail the whole request because the comment WAS saved in Firestore
+        }
+
+        // 3. Push Notifications
+        try {
+            const { sendPushNotification } = require('@/lib/notifications');
+            if (parentId) {
+                // It's a reply: notify the parent comment author
+                const parentDoc = await db.collection('community_comments').doc(parentId).get();
+                if (parentDoc.exists) {
+                    const parentComment = parentDoc.data();
+                    if (parentComment && parentComment.authorId !== authorId) {
+                        sendPushNotification(
+                            parentComment.authorId,
+                            "New Reply! 💬",
+                            `${authorName} replied to your comment: "${text.substring(0, 30)}..."`
+                        );
+                    }
+                }
+            } else {
+                // It's a top-level comment: notify post author
+                const [post] = await sql`SELECT author_id FROM community_posts WHERE id = ${postId}`;
+                if (post && post.author_id !== authorId) {
+                    sendPushNotification(
+                        post.author_id,
+                        "New Comment! 💬",
+                        `${authorName} commented on your post: "${text.substring(0, 30)}..."`
+                    );
+                }
+            }
+        } catch (notifyError) {
+            console.error('Failed to trigger comment/reply notification:', notifyError);
         }
 
         return NextResponse.json({

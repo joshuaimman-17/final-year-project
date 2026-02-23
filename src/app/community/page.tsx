@@ -29,6 +29,13 @@ function CommunityContent() {
 
     useEffect(() => {
         fetchPosts();
+
+        // Data polling: every 2 seconds
+        const pollInterval = setInterval(() => {
+            fetchPosts();
+        }, 2000);
+
+        return () => clearInterval(pollInterval);
     }, []);
 
     const handlePostCreated = (newPost: any) => {

@@ -24,6 +24,8 @@ export default function SignupPage() {
     const [farmName, setFarmName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [countryCode, setCountryCode] = useState('+91');
+    const [username, setUsername] = useState('');
+    const [role, setRole] = useState('CUSTOMER');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -47,11 +49,18 @@ export default function SignupPage() {
         setLoading(true);
         setError('');
 
-        const fullPhoneNumber = phoneNumber ? `${countryCode}${phoneNumber}` : undefined;
-        console.log("Starting Email Signup with:", { email, name, farmName, fullPhoneNumber });
+        if (!phoneNumber) {
+            setError('Phone number is required');
+            setLoading(false);
+            return;
+        }
+
+        const fullPhoneNumber = `${countryCode}${phoneNumber}`;
+        console.log("Starting Email Signup with:", { email, name, farmName, fullPhoneNumber, username, role });
 
         try {
-            await signup(email, password, name, farmName, fullPhoneNumber);
+            // @ts-ignore - Updating signature in AuthContext next
+            await signup(email, password, name, farmName, fullPhoneNumber, username, role);
             console.log("Email Signup successful, redirecting...");
             router.push('/');
         } catch (err: any) {
@@ -128,17 +137,48 @@ export default function SignupPage() {
                         />
                     </div>
 
+                    <div className="row g-2">
+                        <div className="col-12">
+                            <label className="form-label small fw-bold text-muted mb-1">Username (Unique)</label>
+                            <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                className="form-control form-control-lg rounded-3 border bg-light fs-6"
+                                required
+                                placeholder="joshua_expert"
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="form-label small fw-bold text-muted mb-1">Register as</label>
+                        <div className="d-flex gap-2">
+                            {['CUSTOMER', 'FRAMER', 'EXPERT'].map((r) => (
+                                <button
+                                    key={r}
+                                    type="button"
+                                    onClick={() => setRole(r)}
+                                    className={`btn flex-grow-1 py-2 rounded-3 small fw-bold transition-all ${role === r ? 'btn-primary-green shadow-sm' : 'btn-light border text-muted'}`}
+                                    style={{ fontSize: '11px' }}
+                                >
+                                    {r}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="mb-0">
-                        <label className="form-label small fw-bold text-muted mb-1">Phone Number (Optional)</label>
+                        <label className="form-label small fw-bold text-muted mb-1">Phone Number (Required for ID)</label>
                         <div className="input-group">
                             <select
                                 className="form-select border bg-light text-muted"
-                                style={{ maxWidth: '100px' }}
+                                style={{ maxWidth: '90px', fontSize: '13px' }}
                                 value={countryCode}
                                 onChange={(e) => setCountryCode(e.target.value)}
                             >
                                 {COUNTRY_CODES.map((code) => (
-                                    <option key={code.code} value={code.code}>{code.code} ({code.label})</option>
+                                    <option key={code.code} value={code.code}>{code.code}</option>
                                 ))}
                             </select>
                             <input
@@ -146,6 +186,7 @@ export default function SignupPage() {
                                 value={phoneNumber}
                                 onChange={(e) => setPhoneNumber(e.target.value)}
                                 className="form-control form-control-lg border bg-light fs-6"
+                                required
                                 placeholder="1234567890"
                             />
                         </div>

@@ -22,7 +22,7 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     locationLoading: boolean;
-    signup: (email: string, pass: string, name: string, farm: string, phoneNumber?: string) => Promise<void>;
+    signup: (email: string, pass: string, name: string, farm: string, phoneNumber: string, username: string, role: string) => Promise<void>;
     login: (email: string, pass: string) => Promise<void>;
     loginWithGoogle: () => Promise<void>;
     logout: () => Promise<void>;
@@ -31,7 +31,7 @@ interface AuthContextType {
     detectLocation: () => void;
     setUpRecaptcha: (elementId: string) => any;
     startPhoneSignup: (phoneNumber: string, appVerifier: any) => Promise<any>;
-    confirmPhoneSignup: (confirmationResult: any, otp: string, name: string, farm: string) => Promise<void>;
+    confirmPhoneSignup: (confirmationResult: any, otp: string, name: string, farm: string, username: string, role: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -80,38 +80,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             logger.debug(`Auth state changed: ${fbUser ? fbUser.email : 'No user'}`);
             if (fbUser) {
-                // Try to get data from Firestore first
+                // Try to get data from Firestore
                 let extra: any = {};
+                const idForDb = fbUser.phoneNumber || fbUser.uid; // Prioritize phone number as ID
+
                 try {
-                    const userDoc = await getDoc(doc(db, "users", fbUser.uid));
+                    const userDoc = await getDoc(doc(db, "users", idForDb));
                     if (userDoc.exists()) {
                         extra = userDoc.data();
                         logger.debug("Fetched user profile from Firestore", extra);
-                        // Update local storage to keep it in sync
-                        localStorage.setItem(`${USER_DATA_KEY}_${fbUser.uid}`, JSON.stringify(extra));
+                        localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify(extra));
                     } else {
-                        // Fallback to local storage
-                        const stored = localStorage.getItem(`${USER_DATA_KEY}_${fbUser.uid}`);
+                        const stored = localStorage.getItem(`${USER_DATA_KEY}_${idForDb}`);
                         extra = stored ? JSON.parse(stored) : {};
-                        logger.debug("User profile not in Firestore, using local storage fallback");
                     }
                 } catch (error) {
                     logger.error("Error fetching user data from Firestore", error);
-                    // Fallback to local storage on error
-                    const stored = localStorage.getItem(`${USER_DATA_KEY}_${fbUser.uid}`);
+                    const stored = localStorage.getItem(`${USER_DATA_KEY}_${idForDb}`);
                     extra = stored ? JSON.parse(stored) : {};
                 }
 
                 setUser({
-                    id: fbUser.uid,
-                    username: fbUser.email?.split('@')[0] || fbUser.phoneNumber || 'User',
+                    id: idForDb,
+                    username: extra.username || fbUser.email?.split('@')[0] || fbUser.phoneNumber || 'User',
                     full_name: fbUser.displayName || extra.full_name || 'Agri User',
-                    role: 'FARMER',
+                    role: extra.role || 'CUSTOMER',
                     farm_name: extra.farm_name || 'My Farm',
                     latitude: extra.latitude || 36.7783,
                     longitude: extra.longitude || -119.4179,
                     avatarUrl: fbUser.photoURL || undefined,
-                    phoneNumber: extra.phoneNumber || fbUser.phoneNumber || undefined
+                    phoneNumber: fbUser.phoneNumber || extra.phoneNumber || undefined
                 });
             } else {
                 setUser(null);
@@ -122,34 +120,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return unsubscribe;
     }, []);
 
-    const signup = async (email: string, pass: string, name: string, farm: string, phoneNumber?: string) => {
+    const signup = async (email: string, pass: string, name: string, farm: string, phoneNumber: string, username: string, role: string) => {
         logger.info(`Starting signup process for ${email}...`);
         try {
             const res = await createUserWithEmailAndPassword(auth, email, pass);
             logger.info("Firebase User created successfully", { uid: res.user.uid });
             await updateProfile(res.user, { displayName: name });
 
+            const idForDb = phoneNumber; // Use phone number as primary ID
+
             const userData = {
+                id: idForDb,
                 uid: res.user.uid,
+                username,
                 full_name: name,
                 email: email,
                 farm_name: farm,
-                role: 'FARMER',
+                role,
                 latitude: 36.7783,
                 longitude: -119.4179,
                 createdAt: new Date().toISOString(),
-                phoneNumber: phoneNumber || null
+                phoneNumber: phoneNumber
             };
 
-            // Store in localStorage immediately for quick access
-            localStorage.setItem(`${USER_DATA_KEY}_${res.user.uid}`, JSON.stringify(userData));
+            localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify(userData));
 
-            // Firestore write is non-blocking — don't let it break signup
             try {
-                await setDoc(doc(db, "users", res.user.uid), userData);
+                await setDoc(doc(db, "users", idForDb), userData);
                 logger.debug("User profile saved to Firestore");
             } catch (firestoreError) {
-                logger.error("Firestore write failed during signup (user still created)", firestoreError);
+                logger.error("Firestore write failed during signup", firestoreError);
             }
         } catch (error: any) {
             logger.error("Signup failed", error);
