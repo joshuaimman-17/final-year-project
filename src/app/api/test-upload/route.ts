@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { uploadFileToDrive } from '@/lib/googleDrive';
+import { supabaseStorage } from '@/lib/supabase';
 import path from 'path';
 import fs from 'fs';
 
@@ -11,24 +11,24 @@ export async function GET() {
         }
 
         const fileBuffer = fs.readFileSync(filePath);
-        const fileName = `test-upload-v3-${Date.now()}.svg`;
-        const mimeType = 'image/svg+xml';
+        const fileName = `test/supabase-check-${Date.now()}.svg`;
 
-        const driveData = await uploadFileToDrive(fileBuffer, fileName, mimeType);
+        const uploadData = await supabaseStorage.upload(fileBuffer, fileName);
 
         return NextResponse.json({
-            message: 'Upload successful!',
-            fileId: driveData.id,
-            webViewLink: driveData.webViewLink,
+            message: 'Supabase Upload successful!',
+            id: uploadData.id,
+            url: uploadData.url,
+            path: uploadData.path,
             fileName: fileName
         });
 
     } catch (error: any) {
-        console.error('Test Upload Error:', error);
+        console.error('Supabase Test Upload Error:', error);
         return NextResponse.json({
-            error: 'Upload failed',
+            error: 'Supabase Upload failed',
             details: error.message,
-            tip: 'If you see "Service Accounts do not have storage quota", it means the folder belongs to a personal drive. Use a Shared Drive instead.'
+            tip: 'Ensure the APP-STORAGE bucket exists and has public read access enabled.'
         }, { status: 500 });
     }
 }

@@ -1,11 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import admin from '@/lib/firebaseAdmin';
-import { uploadFileToDrive } from '@/lib/googleDrive';
+import { supabaseStorage } from '@/lib/supabase';
 import { appendPostToSheet } from '@/lib/googleSheets';
-
-// Note: Using Firestore client SDK in Route Handlers is generally fine in Next.js 13+ App Router
-// if properly initialized, but for high-load server side, firebase-admin is preferred.
-// Here we use the client SDK 'db' imported from @/lib/firebase as it's already set up.
 
 export async function GET() {
     try {
@@ -40,27 +36,13 @@ export async function POST(req: NextRequest) {
         }
 
         let imageUrl = '';
-        let driveFileId = '';
+        let storagePath = '';
 
         if (image) {
-            const buffer = Buffer.from(await image.arrayBuffer());
-            const driveResponse = await uploadFileToDrive(
-                buffer,
-                `${Date.now()}-${image.name}`,
-                image.type
-            );
-
-            // googleDrive.ts permissions.create handles public view
-            // We use webViewLink or webContentLink. webContentLink is better for direct <img> src
-            imageUrl = driveResponse.webViewLink || ''; // Web view link
-            driveFileId = driveResponse.id || '';
-
-            // Convert webViewLink to a direct embeddable link if possible, 
-            // or just use it as is if the browser handles it.
-            // Often https://drive.google.com/thumbnail?id=FILE_ID is useful for quick previews
-            if (driveFileId) {
-                imageUrl = `https://drive.google.com/thumbnail?id=${driveFileId}&sz=w1000`;
-            }
+            const fileName = `posts/${authorId}/${Date.now()}_${image.name}`;
+            const uploadData = await supabaseStorage.upload(image, fileName);
+            imageUrl = uploadData.url;
+            storagePath = uploadData.path;
         }
 
         const postData = {
@@ -69,7 +51,7 @@ export async function POST(req: NextRequest) {
             authorAvatar,
             content,
             imageUrl,
-            driveFileId,
+            storagePath,
             likeCount: 0,
             commentCount: 0,
             createdAt: admin.firestore.Timestamp.now(),

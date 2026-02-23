@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { uploadFileToDrive } from '@/lib/googleDrive';
+import { supabaseStorage } from '@/lib/supabase';
 import { verifyAuth } from '@/lib/authHelper';
 
 export async function POST(req: NextRequest) {
@@ -16,12 +16,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: 'No file uploaded' }, { status: 400 });
         }
 
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const fileName = `diagnosis_${Date.now()}_${file.name}`;
-        const mimeType = file.type;
+        const fileName = `diagnosis/${decodedToken.uid}/${Date.now()}_${file.name}`;
 
-        // Upload to Google Drive
-        const driveData = await uploadFileToDrive(buffer, fileName, mimeType);
+        // Upload to Supabase Storage
+        const uploadData = await supabaseStorage.upload(file, fileName);
 
         // Simulated AI Diagnoses (Ported Business Logic)
         const diagnoses = [
@@ -48,9 +46,9 @@ export async function POST(req: NextRequest) {
         const result = diagnoses[Math.floor(Math.random() * diagnoses.length)];
 
         return NextResponse.json({
-            id: driveData.id,
+            id: uploadData.id,
             result,
-            imageUrl: driveData.webViewLink,
+            imageUrl: uploadData.url,
             timestamp: new Date()
         });
 
