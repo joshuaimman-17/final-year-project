@@ -9,6 +9,7 @@ import { Icon } from '@/components/Icon';
 export default function LoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -65,7 +66,24 @@ export default function LoginPage() {
                             <label className="form-label small fw-bold text-muted mb-0">Password</label>
                             <Link href="/forgot-password" style={{ color: '#2E7D32' }} className="small text-decoration-none fw-bold">Forgot?</Link>
                         </div>
-                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="form-control form-control-lg rounded-3 border bg-light fs-6" required placeholder="••••••••" />
+                        <div className="position-relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="form-control form-control-lg rounded-3 border bg-light fs-6 pe-5"
+                                required
+                                placeholder="••••••••"
+                            />
+                            <button
+                                type="button"
+                                className="btn position-absolute top-50 end-0 translate-middle-y border-0 pe-3 text-muted"
+                                onClick={() => setShowPassword(!showPassword)}
+                                tabIndex={-1}
+                            >
+                                <Icon name={showPassword ? "visibility" : "visibility_off"} />
+                            </button>
+                        </div>
                     </div>
                     <button type="submit" disabled={loading} className="btn btn-primary-green btn-lg w-100 rounded-3 fw-bold shadow-sm mt-2" style={{ height: '56px' }}>
                         {loading ? <div className="spinner-border spinner-border-sm text-white" role="status"></div> : 'Sign In'}

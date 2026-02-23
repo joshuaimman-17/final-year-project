@@ -19,6 +19,7 @@ const COUNTRY_CODES = [
 export default function SignupPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
     const [name, setName] = useState('');
     const [farmName, setFarmName] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
@@ -152,15 +153,25 @@ export default function SignupPage() {
 
                     <div className="mb-0">
                         <label className="form-label small fw-bold text-muted mb-1">Password</label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            className="form-control form-control-lg rounded-3 border bg-light fs-6"
-                            required
-                            placeholder="••••••••"
-                            minLength={6}
-                        />
+                        <div className="position-relative">
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="form-control form-control-lg rounded-3 border bg-light fs-6 pe-5"
+                                required
+                                placeholder="••••••••"
+                                minLength={6}
+                            />
+                            <button
+                                type="button"
+                                className="btn position-absolute top-50 end-0 translate-middle-y border-0 pe-3 text-muted"
+                                onClick={() => setShowPassword(!showPassword)}
+                                tabIndex={-1}
+                            >
+                                <Icon name={showPassword ? "visibility" : "visibility_off"} />
+                            </button>
+                        </div>
                     </div>
 
                     <button
