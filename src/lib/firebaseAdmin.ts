@@ -6,21 +6,24 @@ const getServiceAccount = () => {
     const envServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
     if (envServiceAccount) {
         try {
+            console.log("Firebase Admin: Attempting to load service account from environment variable");
             return JSON.parse(envServiceAccount);
         } catch (e) {
-            console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT env variable');
+            console.error('Firebase Admin: Failed to parse FIREBASE_SERVICE_ACCOUNT env variable');
         }
     }
 
     try {
         const keyPath = path.resolve(process.cwd(), 'serviceAccountKey.json');
         if (fs.existsSync(keyPath)) {
+            console.log("Firebase Admin: Loading service account from serviceAccountKey.json");
             const keyContent = fs.readFileSync(keyPath, 'utf8');
             return JSON.parse(keyContent);
         }
     } catch (e) {
-        console.error('Failed to read serviceAccountKey.json from disk');
+        console.error('Firebase Admin: Failed to read serviceAccountKey.json from disk');
     }
+    console.warn("Firebase Admin: No service account found in env or disk. Using default credentials.");
     return null;
 };
 
@@ -30,16 +33,18 @@ if (!admin.apps.length) {
     const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || (serviceAccount ? serviceAccount.project_id : undefined);
 
     if (serviceAccount) {
+        console.log("Firebase Admin: Initializing with service account cert");
         admin.initializeApp({
             credential: admin.credential.cert(serviceAccount),
             projectId: projectId,
         });
     } else {
-        // Fallback to default credentials if not found
+        console.log("Firebase Admin: Initializing with default app credentials");
         admin.initializeApp({
             projectId: projectId,
         });
     }
+    console.log(`Firebase Admin: Initialization complete for project: ${projectId}`);
 } else {
     // Check for project mismatch in hot-reloading scenarios
     const currentApp = admin.app();

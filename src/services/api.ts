@@ -1,4 +1,5 @@
 import { WeatherData, ClimateData, SoilData, ElevationData, LocationSearchResult } from '@/types';
+import logger from '@/lib/logger';
 
 // In unified Next.js, API_BASE can be relative for client calls
 const API_BASE = '/api';
@@ -8,22 +9,24 @@ const TREFLE_TOKEN = process.env.NEXT_PUBLIC_TREFLE_TOKEN || 'usr-5g7Tdm-C45Q7SF
 
 // --- 1. Weather API (Open-Meteo) ---
 export const fetchWeather = async (lat: number, lon: number): Promise<WeatherData> => {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,soil_moisture_0_to_1cm&hourly=temperature_2m,relative_humidity_2m,soil_moisture_0_to_1cm&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`;
+    return logger.track(`fetchWeather(${lat}, ${lon})`, (async () => {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,soil_moisture_0_to_1cm&hourly=temperature_2m,relative_humidity_2m,soil_moisture_0_to_1cm&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=auto`;
 
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('Failed to fetch weather data');
-    const data = await res.json();
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Failed to fetch weather data');
+        const data = await res.json();
 
-    return {
-        current: {
-            temperature: data.current.temperature_2m,
-            humidity: data.current.relative_humidity_2m,
-            soil_moisture: data.current.soil_moisture_0_to_1cm,
-            time: data.current.time,
-        },
-        hourly: data.hourly,
-        daily: data.daily
-    };
+        return {
+            current: {
+                temperature: data.current.temperature_2m,
+                humidity: data.current.relative_humidity_2m,
+                soil_moisture: data.current.soil_moisture_0_to_1cm,
+                time: data.current.time,
+            },
+            hourly: data.hourly,
+            daily: data.daily
+        };
+    })());
 };
 
 // --- 2. Historical Climate API (NASA POWER) ---
@@ -125,11 +128,16 @@ export const searchLocation = async (query: string): Promise<LocationSearchResul
 // --- 6. Diagnosis API ---
 const diagnosis = {
     upload: async (formData: FormData): Promise<{ success: boolean }> => {
+        logger.info("Uploading plant image for diagnosis...");
         const res = await fetch(`${API_BASE}/diagnosis/upload`, {
             method: 'POST',
             body: formData
         });
-        if (!res.ok) throw new Error('Diagnosis upload failed');
+        if (!res.ok) {
+            logger.error("Diagnosis upload failed", { status: res.status });
+            throw new Error('Diagnosis upload failed');
+        }
+        logger.info("Diagnosis upload successful");
         return { success: true };
     }
 };

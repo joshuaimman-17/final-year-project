@@ -16,6 +16,7 @@ import {
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, googleProvider, db } from '@/lib/firebase';
+import logger from '@/lib/logger';
 
 interface AuthContextType {
     user: User | null;
@@ -77,6 +78,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+            logger.debug(`Auth state changed: ${fbUser ? fbUser.email : 'No user'}`);
             if (fbUser) {
                 // Try to get data from Firestore first
                 let extra: any = {};
@@ -84,15 +86,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     const userDoc = await getDoc(doc(db, "users", fbUser.uid));
                     if (userDoc.exists()) {
                         extra = userDoc.data();
+                        logger.debug("Fetched user profile from Firestore", extra);
                         // Update local storage to keep it in sync
                         localStorage.setItem(`${USER_DATA_KEY}_${fbUser.uid}`, JSON.stringify(extra));
                     } else {
                         // Fallback to local storage
                         const stored = localStorage.getItem(`${USER_DATA_KEY}_${fbUser.uid}`);
                         extra = stored ? JSON.parse(stored) : {};
+                        logger.debug("User profile not in Firestore, using local storage fallback");
                     }
                 } catch (error) {
-                    console.error("Error fetching user data from Firestore:", error);
+                    logger.error("Error fetching user data from Firestore", error);
                     // Fallback to local storage on error
                     const stored = localStorage.getItem(`${USER_DATA_KEY}_${fbUser.uid}`);
                     extra = stored ? JSON.parse(stored) : {};
@@ -119,8 +123,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const signup = async (email: string, pass: string, name: string, farm: string, phoneNumber?: string) => {
+        logger.info(`Starting signup process for ${email}...`);
         try {
             const res = await createUserWithEmailAndPassword(auth, email, pass);
+            logger.info("Firebase User created successfully", { uid: res.user.uid });
             await updateProfile(res.user, { displayName: name });
 
             const userData = {
@@ -141,18 +147,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Firestore write is non-blocking — don't let it break signup
             try {
                 await setDoc(doc(db, "users", res.user.uid), userData);
+                logger.debug("User profile saved to Firestore");
             } catch (firestoreError) {
-                console.error("Firestore write failed during signup (user still created):", firestoreError);
+                logger.error("Firestore write failed during signup (user still created)", firestoreError);
             }
         } catch (error: any) {
+            logger.error("Signup failed", error);
             throw new Error(getAuthErrorMessage(error));
         }
     };
 
     const login = async (email: string, pass: string) => {
+        logger.info(`Attempting login for ${email}...`);
         try {
             await signInWithEmailAndPassword(auth, email, pass);
+            logger.info("Login successful");
         } catch (error: any) {
+            logger.error("Login failed", error);
             throw new Error(getAuthErrorMessage(error));
         }
     };
