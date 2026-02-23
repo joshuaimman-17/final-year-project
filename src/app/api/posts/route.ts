@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import getDb from '@/lib/db';
+import sql from '@/lib/db';
 import { verifyAuth } from '@/lib/authHelper';
 
 export async function GET() {
     try {
-        const sql = getDb();
         const posts = await sql`SELECT * FROM posts ORDER BY created_at DESC`;
         return NextResponse.json(posts);
     } catch (err: any) {
@@ -25,10 +24,15 @@ export async function POST(req: NextRequest) {
         const authorRole = author_role || 'FARMER';
         const postTags = tags || [];
 
-        const sql = getDb();
         const result = await sql`
             INSERT INTO posts (author_name, author_role, content, image_url, tags)
-            VALUES (${authorName}, ${authorRole}, ${content}, ${image_url}, ${postTags})
+            VALUES (
+                ${authorName}::text, 
+                ${authorRole}::text, 
+                ${content || null}::text, 
+                ${image_url || null}::text, 
+                ${postTags}
+            )
             RETURNING *
         `;
 

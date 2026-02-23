@@ -64,6 +64,19 @@ export async function POST(req: NextRequest) {
             storagePath = uploadData.path;
         }
 
+        // --- LAZY USER SYNC ---
+        // Ensure user exists in Postgres to satisfy foreign key constraint
+        const decodedToken = await verifyAuth(req);
+        const email = decodedToken?.email || '';
+
+        await sql`
+            INSERT INTO users (id, email, username, full_name, avatar_url)
+            VALUES (${authorId}, ${email}, ${authorName || email.split('@')[0]}, ${authorName}, ${authorAvatar})
+            ON CONFLICT (id) DO UPDATE SET
+                full_name = EXCLUDED.full_name,
+                avatar_url = EXCLUDED.avatar_url
+        `;
+
         const [newPost] = await sql`
             INSERT INTO community_posts (
                 author_id, author_name, author_avatar, content, image_url, storage_path
