@@ -16,8 +16,7 @@ Login to your Vercel Dashboard and add the following Environment Variables for y
 
 ### Third-Party APIs
 *   `NEXT_PUBLIC_AGRO_API_KEY`
-*   `NEXT_PUBLIC_TREFLE_TOKEN`
-*   `DATABASE_URL` (Your Neon Postgres connection string)
+*   `DATABASE_URL` (Your Supabase Postgres connection string from the "Settings > Database" tab)
 
 ### Firebase Admin (Private)
 > [!IMPORTANT]
@@ -35,9 +34,12 @@ Login to your Vercel Dashboard and add the following Environment Variables for y
 2. Import the project in Vercel.
 3. Configure the environment variables during the import process.
 
-## 3. Verify PWA Support
+## 4. Initialize Production Database (Mandatory)
 
-After deployment, visit your site using a mobile browser. You should be prompted to "Add to Home Screen," and the service worker should be active, allowing the app to work offline.
+After your first deployment, you must initialize the database tables:
+1. Visit `https://your-app-url.vercel.app/api/migrate` in your browser.
+2. You should see a JSON message: `{"message":"Database initialized successfully!"}`.
+3. This creates the `community_posts`, `users`, and `post_likes` tables required for the community features.
 
 > [!NOTE]
-> Ensure that `process.env.NODE_ENV === 'production'` for `next-pwa` to be active. In local development with the `--webpack` flag, PWA features are disabled by default to speed up builds.
+> Ensure that `process.env.NODE_ENV === 'production'` for `next-pwa` to be active. In local development, PWA features are disabled by default.

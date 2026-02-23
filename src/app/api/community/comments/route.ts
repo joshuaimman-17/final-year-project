@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import admin from '@/lib/firebaseAdmin';
+import sql from '@/lib/db';
 
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const postId = searchParams.get('postId');
-        const parentId = searchParams.get('parentId') || null;
+        let parentId = searchParams.get('parentId');
+
+        // Handle string representation of null from client
+        if (parentId === 'null' || !parentId) {
+            parentId = null;
+        }
 
         if (!postId) {
             return NextResponse.json({ message: 'postId is required' }, { status: 400 });
@@ -52,14 +58,20 @@ export async function POST(req: NextRequest) {
 
         const db = admin.firestore();
 
-        // 1. Save comment
+        // 1. Save comment in Firestore
         const docRef = await db.collection('community_comments').add(commentData);
 
-        // 2. Increment comment count on the post
-        const postRef = db.collection('community_posts').doc(postId);
-        await postRef.update({
-            commentCount: admin.firestore.FieldValue.increment(1)
-        });
+        // 2. Increment comment count in Supabase Postgres
+        try {
+            await sql`
+                UPDATE community_posts 
+                SET comment_count = comment_count + 1 
+                WHERE id = ${postId}
+            `;
+        } catch (sqlError) {
+            console.error('Failed to sync comment count to Postgres:', sqlError);
+            // We don't fail the whole request because the comment WAS saved in Firestore
+        }
 
         return NextResponse.json({
             id: docRef.id,

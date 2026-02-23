@@ -18,15 +18,17 @@ interface Comment {
 interface CommentSectionProps {
     postId: string;
     parentId?: string | null;
+    refreshKey?: number;
 }
 
-export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId = null }) => {
+export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId = null, refreshKey = 0 }) => {
     const { user } = useAuth();
     const [comments, setComments] = useState<Comment[]>([]);
     const [loading, setLoading] = useState(true);
     const [newComment, setNewComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
+    const [refreshKeys, setRefreshKeys] = useState<Record<string, number>>({});
 
     const fetchComments = async () => {
         try {
@@ -43,7 +45,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
 
     useEffect(() => {
         fetchComments();
-    }, [postId, parentId]);
+    }, [postId, parentId, refreshKey]);
 
     const handleSubmit = async (e: React.FormEvent, customParentId: string | null = null) => {
         e.preventDefault();
@@ -67,7 +69,15 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
             const data = await res.json();
 
             // Update UI
-            setComments(prev => [...prev, data]);
+            if (!customParentId) {
+                setComments(prev => [...prev, data]);
+            } else {
+                setRefreshKeys(prev => ({
+                    ...prev,
+                    [customParentId]: (prev[customParentId] || 0) + 1
+                }));
+            }
+
             setNewComment('');
             setReplyingTo(null);
         } catch (error) {
@@ -149,7 +159,11 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
                                 )}
 
                                 {/* Recursive nested comments */}
-                                <CommentSection postId={postId} parentId={comment.id} />
+                                <CommentSection
+                                    postId={postId}
+                                    parentId={comment.id}
+                                    refreshKey={refreshKeys[comment.id] || 0}
+                                />
                             </div>
                         </div>
                     </div>
