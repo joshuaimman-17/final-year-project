@@ -73,26 +73,33 @@ export const EncryptionService = {
      * Decrypts a message using the stored local private key.
      */
     async decrypt(encryptedBase64: string) {
+        if (!encryptedBase64) return "";
+
         const privateKeyBase64 = localStorage.getItem(PRIVATE_KEY_STORAGE_KEY);
         if (!privateKeyBase64) throw new Error("Private key not found");
 
-        const privateKeyBuffer = Uint8Array.from(atob(privateKeyBase64), c => c.charCodeAt(0)).buffer;
+        try {
+            const privateKeyBuffer = Uint8Array.from(atob(privateKeyBase64), c => c.charCodeAt(0)).buffer;
 
-        const privateKey = await window.crypto.subtle.importKey(
-            "pkcs8",
-            privateKeyBuffer,
-            { name: "RSA-OAEP", hash: "SHA-256" },
-            false,
-            ["decrypt"]
-        );
+            const privateKey = await window.crypto.subtle.importKey(
+                "pkcs8",
+                privateKeyBuffer,
+                { name: "RSA-OAEP", hash: "SHA-256" },
+                false,
+                ["decrypt"]
+            );
 
-        const encryptedBuffer = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0)).buffer;
-        const decryptedBuffer = await window.crypto.subtle.decrypt(
-            { name: "RSA-OAEP" },
-            privateKey,
-            encryptedBuffer
-        );
+            const encryptedBuffer = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0)).buffer;
+            const decryptedBuffer = await window.crypto.subtle.decrypt(
+                { name: "RSA-OAEP" },
+                privateKey,
+                encryptedBuffer
+            );
 
-        return new TextDecoder().decode(decryptedBuffer);
+            return new TextDecoder().decode(decryptedBuffer);
+        } catch (e) {
+            console.error("EncryptionService.decrypt failed:", e);
+            throw new Error("Failed to decrypt message. The payload or key might be invalid.");
+        }
     }
 };
