@@ -23,7 +23,7 @@ export const useWeatherData = (lat: number, lon: number) => {
         };
 
         load();
-        const interval = setInterval(load, 5 * 60 * 1000); // Poll every 5 minutes
+        const interval = setInterval(load, 15 * 60 * 1000); // Poll every 15 minutes
 
         return () => clearInterval(interval);
     }, [lat, lon]);

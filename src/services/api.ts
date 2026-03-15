@@ -5,7 +5,7 @@ import logger from '@/lib/logger';
 const API_BASE = '/api';
 // In Next.js, use NEXT_PUBLIC_ for client-side environment variables
 const AGRO_API_KEY = process.env.NEXT_PUBLIC_AGRO_API_KEY || '';
-const TREFLE_TOKEN = process.env.NEXT_PUBLIC_TREFLE_TOKEN || 'usr-5g7Tdm-C45Q7SF0F2n8b-DWVR4C0rLF6jkOL_Hj8KGU';
+const TREFLE_TOKEN = process.env.NEXT_PUBLIC_TREFLE_TOKEN || '';
 
 // --- 1. Weather API (Open-Meteo) ---
 export const fetchWeather = async (lat: number, lon: number): Promise<WeatherData> => {
@@ -125,6 +125,30 @@ export const searchLocation = async (query: string): Promise<LocationSearchResul
     return await res.json();
 };
 
+export const reverseGeocode = async (lat: number, lon: number): Promise<string> => {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+    try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Reverse geocoding failed');
+        const data = await res.json();
+        
+        const address = data.address;
+        if (!address) return "Unknown Location";
+
+        const city = address.city || address.town || address.village || address.suburb;
+        const state = address.state || address.county;
+        
+        if (city && state) return `${city}, ${state}`;
+        if (city) return city;
+        if (state) return state;
+        
+        return data.display_name.split(',')[0] || "Unknown Location";
+    } catch (e) {
+        console.error("Reverse Geocode error", e);
+        return "Unknown Location";
+    }
+};
+
 // --- 6. Diagnosis API ---
 const diagnosis = {
     upload: async (formData: FormData): Promise<{ success: boolean }> => {
@@ -190,15 +214,102 @@ const trefle = {
     }
 };
 
+// --- 9. Marketplace APIs ---
+const marketListings = {
+    list: async (limit?: number, lastId?: string) => {
+        const query = new URLSearchParams();
+        if (limit) query.append('limit', limit.toString());
+        if (lastId) query.append('lastId', lastId);
+        const res = await fetch(`/api/market_listings?${query.toString()}`);
+        if (!res.ok) throw new Error('Failed to fetch market listings');
+        return await res.json();
+    },
+    create: async (data: any) => {
+        const { auth } = await import('@/lib/firebase');
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch('/api/market_listings', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token && { Authorization: `Bearer ${token}` })
+            },
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Failed to create market listing');
+        return await res.json();
+    },
+    delete: async (id: string) => {
+        const { auth } = await import('@/lib/firebase');
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`/api/market_listings/${id}`, {
+            method: 'DELETE',
+            headers: {
+                ...(token && { Authorization: `Bearer ${token}` })
+            }
+        });
+        if (!res.ok) throw new Error('Failed to delete market listing');
+        return await res.json();
+    }
+};
+
+const buyerRequests = {
+    list: async (limit?: number, lastId?: string) => {
+        const query = new URLSearchParams();
+        if (limit) query.append('limit', limit.toString());
+        if (lastId) query.append('lastId', lastId);
+        const res = await fetch(`/api/buyer_requests?${query.toString()}`);
+        if (!res.ok) throw new Error('Failed to fetch buyer requests');
+        return await res.json();
+    },
+    create: async (data: any) => {
+        const { auth } = await import('@/lib/firebase');
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch('/api/buyer_requests', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token && { Authorization: `Bearer ${token}` })
+            },
+            body: JSON.stringify(data)
+        });
+        if (!res.ok) throw new Error('Failed to create buyer request');
+        return await res.json();
+    },
+    delete: async (id: string) => {
+        const { auth } = await import('@/lib/firebase');
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`/api/buyer_requests/${id}`, {
+            method: 'DELETE',
+            headers: {
+                ...(token && { Authorization: `Bearer ${token}` })
+            }
+        });
+        if (!res.ok) throw new Error('Failed to delete buyer request');
+        return await res.json();
+    }
+};
+
+const marketPrices = {
+    list: async () => {
+        const res = await fetch('/api/mandi_prices');
+        if (!res.ok) throw new Error('Failed to fetch mandi prices');
+        return await res.json();
+    }
+};
+
 export const api = {
     fetchWeather,
     fetchClimate,
     fetchSoil,
     fetchElevation,
     searchLocation,
+    reverseGeocode,
     diagnosis,
     posts,
     products,
     agro,
-    trefle
+    trefle,
+    marketListings,
+    buyerRequests,
+    marketPrices
 };

@@ -15,6 +15,7 @@ import {
 } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import logger from '@/lib/logger';
+import { EncryptionService } from '@/lib/encryption';
 
 interface AuthContextType {
     user: User | null;
@@ -68,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [locationLoading, setLocationLoading] = useState(false);
     const watchIdRef = useRef<number | null>(null);
     const userRef = useRef<User | null>(null);
+    const lastSyncRef = useRef<number>(0);
 
     // Keep userRef in sync so callbacks can access latest user
     useEffect(() => {
@@ -75,44 +77,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, [user]);
 
     useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
+const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             logger.debug(`Auth state changed: ${fbUser ? fbUser.email : 'No user'}`);
             if (fbUser) {
                 const idForDb = fbUser.phoneNumber || fbUser.uid;
 
                 try {
-                    // Fetch user profile from Postgres via sync API
+                    // Get data from localStorage if exists (for faster UI)
+                    const stored = localStorage.getItem(`${USER_DATA_KEY}_${idForDb}`);
+                    const localData = stored ? JSON.parse(stored) : null;
+
+                    // Fetch user profile from Postgres via sync API (POST)
                     const token = await fbUser.getIdToken();
                     const res = await fetch('/api/auth/sync', {
-                        headers: { 'Authorization': `Bearer ${token}` }
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(localData || {}) // Send local cache for sync if exists
                     });
 
                     if (res.ok) {
-                        const profile = await res.json();
+                        const { user: profile } = await res.json();
                         setUser({
                             id: profile.id,
                             username: profile.username || fbUser.email?.split('@')[0] || profile.id,
                             full_name: profile.full_name || fbUser.displayName || 'Agri User',
                             role: profile.role || 'CUSTOMER',
                             farm_name: profile.farm_name || 'My Farm',
-                            latitude: profile.latitude || 36.7783,
-                            longitude: profile.longitude || -119.4179,
+                            latitude: profile.latitude || 20.5937,
+                            longitude: profile.longitude || 78.9629,
                             avatarUrl: profile.avatar_url || fbUser.photoURL || undefined,
                             phoneNumber: profile.id
                         });
                         localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify(profile));
+                        
+                        // ── Global E2E Key initialization ──
+                        // Ensure user is messageable immediately (user-isolated)
+                        (async () => {
+                            try {
+                                const localPubKey = EncryptionService.getLocalPublicKey(idForDb);
+                                const token = await fbUser.getIdToken();
+                                const params = new URLSearchParams({ userId: idForDb });
+                                const keysRes = await fetch(`/api/chat/keys?${params.toString()}`, {
+                                    headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                const keysData = await keysRes.json();
+                                
+                                if (!keysData.publicKey && !localPubKey) {
+                                    logger.info(`[Auth] Initializing new E2E keys for user ${idForDb}...`);
+                                    await EncryptionService.generateKeyPair(idForDb);
+                                    const newLocalPubKey = EncryptionService.getLocalPublicKey(idForDb);
+                                    await fetch('/api/chat/keys', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                        body: JSON.stringify({ publicKey: newLocalPubKey }),
+                                    });
+                                } else if (!keysData.publicKey && localPubKey) {
+                                    logger.info(`[Auth] Uploading local public key for user ${idForDb}...`);
+                                    await fetch('/api/chat/keys', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                                        body: JSON.stringify({ publicKey: localPubKey }),
+                                    });
+                                }
+                            } catch (e) {
+                                logger.error("[Auth] Global E2E init failed", e);
+                            }
+                        })();
                     } else {
                         // Fallback to local storage if API fails
-                        const stored = localStorage.getItem(`${USER_DATA_KEY}_${idForDb}`);
-                        const extra = stored ? JSON.parse(stored) : {};
+                        const extra = localData || {};
                         setUser({
                             id: idForDb,
                             username: extra.username || fbUser.email?.split('@')[0] || fbUser.phoneNumber || 'User',
                             full_name: fbUser.displayName || extra.full_name || 'Agri User',
                             role: extra.role || 'CUSTOMER',
                             farm_name: extra.farm_name || 'My Farm',
-                            latitude: extra.latitude || 36.7783,
-                            longitude: extra.longitude || -119.4179,
+                            latitude: extra.latitude || 20.5937,
+                            longitude: extra.longitude || 78.9629,
                             avatarUrl: fbUser.photoURL || undefined,
                             phoneNumber: fbUser.phoneNumber || extra.phoneNumber || undefined
                         });
@@ -127,8 +171,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         full_name: fbUser.displayName || extra.full_name || 'Agri User',
                         role: extra.role || 'CUSTOMER',
                         farm_name: extra.farm_name || 'My Farm',
-                        latitude: extra.latitude || 36.7783,
-                        longitude: extra.longitude || -119.4179,
+                        latitude: extra.latitude || 20.5937,
+                        longitude: extra.longitude || 78.9629,
                         avatarUrl: fbUser.photoURL || undefined,
                         phoneNumber: fbUser.phoneNumber || extra.phoneNumber || undefined
                     });
@@ -149,7 +193,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             logger.info("Firebase User created successfully", { uid: res.user.uid });
             await updateProfile(res.user, { displayName: name });
 
-            const idForDb = phoneNumber;
+            const idForDb = res.user.uid; // Always use UID for email signups initially
             const userData = {
                 id: idForDb,
                 uid: res.user.uid,
@@ -158,10 +202,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 email: email,
                 farm_name: farm,
                 role,
-                latitude: 36.7783,
-                longitude: -119.4179,
+                latitude: 20.5937,
+                longitude: 78.9629,
                 createdAt: new Date().toISOString(),
-                phoneNumber: phoneNumber
+                phoneNumber: phoneNumber // Save as a regular field
             };
 
             localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify(userData));
@@ -248,7 +292,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const extra = stored ? JSON.parse(stored) : {};
         localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify({ ...extra, latitude: lat, longitude: lon }));
 
-        // TODO: Push to Postgres
+        // ── Throttled sync to Postgres ──
+        const now = Date.now();
+        if (now - lastSyncRef.current > 5 * 60 * 1000) { // Every 5 minutes
+            const sync = async () => {
+                try {
+                    const token = await fbUser.getIdToken();
+                    await fetch('/api/auth/sync', {
+                        method: 'POST',
+                        headers: { 
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ latitude: lat, longitude: lon })
+                    });
+                    lastSyncRef.current = now;
+                    logger.debug("Location synced to Postgres");
+                } catch (e) {
+                    logger.error("Failed to sync location to Postgres", e);
+                }
+            };
+            sync();
+        }
     }, []);
 
     useEffect(() => {

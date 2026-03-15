@@ -34,9 +34,10 @@ interface MapProps {
   lon: number;
   isLive: boolean;
   onRecenter: () => void;
+  showMarkers?: { id: number | string; lat: number; lon: number; name: string }[];
 }
 
-export default function FarmMap({ lat, lon, isLive, onRecenter }: MapProps) {
+export default function FarmMap({ lat, lon, isLive, onRecenter, showMarkers }: MapProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -78,6 +79,17 @@ export default function FarmMap({ lat, lon, isLive, onRecenter }: MapProps) {
             </div>
           </Popup>
         </Marker>
+
+        {showMarkers?.map(marker => (
+          <Marker key={marker.id} position={[marker.lat, marker.lon]} icon={defaultIcon}>
+            <Popup className="custom-leaflet-popup">
+              <div className="text-center">
+                <strong>{marker.name}</strong><br/>
+                <span className="text-muted small">Market</span>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
 
       {/* Floating Controls Overlay */}

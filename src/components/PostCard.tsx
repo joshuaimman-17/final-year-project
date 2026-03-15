@@ -16,6 +16,12 @@ export const PostCard: React.FC<PostCardProps> = ({ post }) => {
     const [likeCount, setLikeCount] = useState<number>(post.likeCount || 0);
     const [showComments, setShowComments] = useState(false);
 
+    // Sync state with props to handle updates from the 2s polling
+    React.useEffect(() => {
+        setLiked(post.liked || false);
+        setLikeCount(post.likeCount || 0);
+    }, [post.liked, post.likeCount]);
+
     const handleLike = async () => {
         const newLiked = !liked;
         const diff = newLiked ? 1 : -1;

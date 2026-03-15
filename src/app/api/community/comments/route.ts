@@ -8,7 +8,10 @@ export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const postId = searchParams.get('postId');
-        const parentId = searchParams.get('parentId') || null;
+        let parentId = searchParams.get('parentId');
+        if (parentId === 'null' || parentId === '') {
+            parentId = null;
+        }
 
         if (!postId) {
             return NextResponse.json({ message: 'postId is required' }, { status: 400 });

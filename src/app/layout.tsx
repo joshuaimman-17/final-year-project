@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { ToastProvider } from "@/context/ToastContext";
 import BootstrapClient from "@/components/BootstrapClient";
 
 const inter = Inter({
@@ -71,9 +72,11 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} antialiased`}>
         <AuthProvider>
-          <div className="bg-light min-vh-100">
-            {children}
-          </div>
+          <ToastProvider>
+            <div className="bg-light min-vh-100">
+              {children}
+            </div>
+          </ToastProvider>
         </AuthProvider>
         <BootstrapClient />
       </body>

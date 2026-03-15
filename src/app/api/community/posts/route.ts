@@ -8,10 +8,29 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
     try {
         const decodedToken = await verifyAuth(req);
-        const userId = (decodedToken?.phone_number || decodedToken?.uid || null) as string | null;
+        // We ensure we can fetch posts even if user isn't fully authenticated, but 'liked' requires userId.
+        const userId = decodedToken ? (decodedToken.phone_number || decodedToken.uid || null) as string | null : null;
 
         const db = admin.firestore();
         const postsSnap = await db.collection('community_posts').orderBy('createdAt', 'desc').get();
+
+        // Perform lookups if we have a userId
+        let userLikes = new Set<string>();
+        if (userId) {
+            // Find all like docs for this user matching these posts
+            const docRefs = postsSnap.docs.map(doc => db.collection('post_likes').doc(`${doc.id}_${userId}`));
+
+            if (docRefs.length > 0) {
+                // Batch fetch (getAll supports up to 100 max, but typically we want to loop if > 100 limits, 
+                // but let's just do Promise.all() for get() to handle any size cleanly)
+                const likeDocs = await Promise.all(docRefs.map(ref => ref.get()));
+                likeDocs.forEach((likeDoc, index) => {
+                    if (likeDoc.exists) {
+                        userLikes.add(postsSnap.docs[index].id);
+                    }
+                });
+            }
+        }
 
         const formattedPosts = postsSnap.docs.map(doc => {
             const data = doc.data();
@@ -25,7 +44,7 @@ export async function GET(req: NextRequest) {
                 storagePath: data.storagePath,
                 likeCount: data.likeCount || 0,
                 commentCount: data.commentCount || 0,
-                liked: false, // Liked logic will need a separate check if required
+                liked: userLikes.has(doc.id),
                 createdAt: data.createdAt?.toDate() || new Date()
             };
         });

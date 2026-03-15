@@ -28,13 +28,14 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
     const [comments, setComments] = useState<Comment[]>([]);
     const [loading, setLoading] = useState(true);
     const [newComment, setNewComment] = useState('');
+    const [replyComment, setReplyComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [replyingTo, setReplyingTo] = useState<string | null>(null);
     const [refreshKeys, setRefreshKeys] = useState<Record<string, number>>({});
 
     const fetchComments = async () => {
         try {
-            const url = `/api/community/comments?postId=${postId}${parentId ? `&parentId=${parentId}` : '&parentId=null'}`;
+            const url = `/api/community/comments?postId=${postId}${parentId ? `&parentId=${parentId}` : ''}`;
             const res = await fetch(url);
             if (!res.ok) {
                 const errorData = await res.json();
@@ -91,8 +92,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
 
     const handleSubmit = async (e: React.FormEvent, customParentId: string | null = null) => {
         e.preventDefault();
-        const text = customParentId ? newComment : newComment; // Placeholder logic
-        if (!newComment.trim() || !user) return;
+        const text = customParentId ? replyComment : newComment;
+        if (!text.trim() || !user) return;
 
         setSubmitting(true);
         try {
@@ -105,7 +106,7 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
                     authorId: user.id || user._id,
                     authorName: user.full_name || user.username,
                     authorAvatar: user.avatarUrl || '',
-                    text: newComment
+                    text: text
                 })
             });
             const data = await res.json();
@@ -113,14 +114,15 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
             // Update UI
             if (!customParentId) {
                 setComments(prev => [...prev, data]);
+                setNewComment('');
             } else {
                 setRefreshKeys(prev => ({
                     ...prev,
                     [customParentId]: (prev[customParentId] || 0) + 1
                 }));
+                setReplyComment('');
             }
 
-            setNewComment('');
             setReplyingTo(null);
         } catch (error) {
             console.error('Failed to post comment:', error);
@@ -198,13 +200,13 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
                                     <form onSubmit={(e) => handleSubmit(e, comment.id)} className="d-flex gap-2 mt-2">
                                         <input
                                             type="text"
-                                            value={newComment}
-                                            onChange={(e) => setNewComment(e.target.value)}
+                                            value={replyComment}
+                                            onChange={(e) => setReplyComment(e.target.value)}
                                             placeholder={`Reply to ${comment.authorName}...`}
                                             className="form-control form-control-sm rounded-pill border-0 shadow-none px-3 bg-white"
                                             autoFocus
                                         />
-                                        <button type="submit" className="btn btn-success btn-sm rounded-pill px-3" disabled={submitting}>Post</button>
+                                        <button type="submit" className="btn btn-success btn-sm rounded-pill px-3" disabled={submitting || !replyComment.trim()}>Post</button>
                                     </form>
                                 )}
 

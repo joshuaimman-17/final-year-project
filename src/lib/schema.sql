@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL DEFAULT 'CUSTOMER', -- 'CUSTOMER', 'FRAMER', 'EXPERT'
     farm_name TEXT,
     location TEXT,
+    latitude DECIMAL(10, 8),
+    longitude DECIMAL(11, 8),
     avatar_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -76,6 +78,7 @@ CREATE TABLE IF NOT EXISTS fcm_tokens (
 CREATE TABLE IF NOT EXISTS user_public_keys (
     user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     public_key TEXT NOT NULL, -- Base64 encoded RSA public key
+    encrypted_private_key TEXT, -- AES encrypted private key (Base64)
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

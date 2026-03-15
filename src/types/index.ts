@@ -116,3 +116,33 @@ export interface ReviewCase {
     timestamp: string;
     status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
 }
+export interface MarketListing {
+    id: string;
+    user_id: string;
+    crop_name: string;
+    quantity: number;
+    price: number;
+    location: string;
+    contact?: string;
+    created_at: string | Date;
+}
+
+export interface BuyerRequest {
+    id: string;
+    buyer_name: string;
+    crop_name: string;
+    quantity: number;
+    offered_price?: number;
+    location: string;
+    contact: string;
+    created_at: string | Date;
+}
+
+export interface MandiPrice {
+    id: string;
+    crop: string;
+    market: string;
+    min_price: number;
+    max_price: number;
+    avg_price: number;
+}

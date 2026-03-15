@@ -194,6 +194,16 @@ function DashboardContent() {
   const moistStatus = getMoistureLabel(parseFloat(currentMoisture));
   const tempStatus  = getTempLabel(data.current.temperature);
 
+  const getTrend = (series: number[]) => {
+    if (series.length < 2) return 0;
+    const last = series[0];
+    const prev = series[1];
+    return last > prev ? 1 : last < prev ? -1 : 0;
+  };
+
+  const tempTrend = getTrend(data.hourly.temperature_2m);
+  const moistTrend = getTrend(data.hourly.soil_moisture_0_to_1cm);
+
   const getSmartTip = () => {
     if (data.current.humidity > 80) return "High humidity: Watch for fungal growth.";
     if (parseFloat(currentMoisture) < 30) return "Soil is dry: Best time to irrigate.";
@@ -270,7 +280,7 @@ function DashboardContent() {
             style={{ width: '128px', height: '128px', filter: 'blur(32px)' }} />
           <div className="position-relative z-1 d-flex justify-content-between align-items-start">
             <div>
-              <h2 className="display-4 fw-bold mb-0">{data.current.temperature}°</h2>
+              <h2 className="display-4 fw-bold mb-0">{data.current.temperature.toFixed(1)}°</h2>
               <p className="text-white-50 mt-1 d-flex align-items-center gap-1 mb-0 font-monospace" style={{ fontSize: '0.7rem' }}>
                 <Icon name="location_on" className="fs-6" />
                 {lat.toFixed(4)}, {lon.toFixed(4)}
@@ -281,16 +291,25 @@ function DashboardContent() {
           </div>
           <div className="position-relative z-1 row g-2 mt-4">
             {[
-              { icon: 'water_drop', label: 'Air Humid', value: `${data.current.humidity}%`, sub: null, color: 'text-info' },
-              { icon: 'grass', label: 'Soil', value: `${currentMoisture}%`, sub: moistStatus, color: 'text-white' },
-              { icon: 'device_thermostat', label: 'Health', value: `${data.current.temperature}°`, sub: tempStatus, color: 'text-warning' },
-            ].map(({ icon, label, value, sub, color }) => (
+              { icon: 'water_drop', label: 'Air Humid', value: `${data.current.humidity}%`, trend: 0, sub: null, color: 'text-info' },
+              { icon: 'grass', label: 'Soil', value: `${currentMoisture}%`, trend: moistTrend, sub: moistStatus, color: 'text-white' },
+              { icon: 'device_thermostat', label: 'Health', value: `${data.current.temperature.toFixed(1)}°`, trend: tempTrend, sub: tempStatus, color: 'text-warning' },
+            ].map(({ icon, label, value, trend, sub, color }) => (
               <div key={label} className="col">
-                <div className="bg-white bg-opacity-10 rounded-3 p-2 text-center transition-all hover-scale">
-                  <Icon name={icon} className={`${color} mb-1`} />
-                  <p className="small text-white-50 mb-0">{label}</p>
-                  <p className="fw-bold mb-0 lh-1">{value}</p>
-                  {sub && <span className={`fw-bold ${sub.color}`} style={{ fontSize: '0.65rem' }}>{sub.text}</span>}
+                <div className="bg-white bg-opacity-10 rounded-3 p-2 text-center transition-all hover-scale h-100">
+                  <div className="position-relative">
+                    <Icon name={icon} className={`${color} mb-1`} />
+                    {trend !== 0 && (
+                      <Icon 
+                        name={trend > 0 ? "trending_up" : "trending_down"} 
+                        className={`position-absolute top-0 start-100 translate-middle-x ${trend > 0 ? "text-success" : "text-danger"}`} 
+                        style={{ fontSize: '12px' }} 
+                      />
+                    )}
+                  </div>
+                  <p className="small text-white-50 mb-0" style={{ fontSize: '10px' }}>{label}</p>
+                  <p className="fw-bold mb-0 small">{value}</p>
+                  {sub && <div className={`fw-bold ${sub.color}`} style={{ fontSize: '0.6rem' }}>{sub.text}</div>}
                 </div>
               </div>
             ))}
