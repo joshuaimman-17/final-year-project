@@ -70,6 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const watchIdRef = useRef<number | null>(null);
     const userRef = useRef<User | null>(null);
     const lastSyncRef = useRef<number>(0);
+    const pendingSignupData = useRef<any>(null);
 
     // Keep userRef in sync so callbacks can access latest user
     useEffect(() => {
@@ -85,7 +86,7 @@ const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
                 try {
                     // Get data from localStorage if exists (for faster UI)
                     const stored = localStorage.getItem(`${USER_DATA_KEY}_${idForDb}`);
-                    const localData = stored ? JSON.parse(stored) : null;
+                    const localData = (stored ? JSON.parse(stored) : null) || pendingSignupData.current;
 
                     // Fetch user profile from Postgres via sync API (POST)
                     const token = await fbUser.getIdToken();
@@ -95,23 +96,40 @@ const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
                             'Authorization': `Bearer ${token}`,
                             'Content-Type': 'application/json'
                         },
-                        body: JSON.stringify(localData || {}) // Send local cache for sync if exists
+                        body: JSON.stringify(localData || {}) // Send local cache or pending signup data
                     });
 
                     if (res.ok) {
                         const { user: profile } = await res.json();
+                        const isAdminEmail = fbUser.email?.toLowerCase() === 'ksdharanidharan2005@gmail.com';
+                        const finalRole = isAdminEmail ? 'ADMIN' : (profile.role || 'BUYER');
+
                         setUser({
                             id: profile.id,
                             username: profile.username || fbUser.email?.split('@')[0] || profile.id,
                             full_name: profile.full_name || fbUser.displayName || 'Agri User',
-                            role: profile.role || 'CUSTOMER',
+                            role: finalRole as any,
+                            email: fbUser.email || undefined,
                             farm_name: profile.farm_name || 'My Farm',
                             latitude: profile.latitude || 20.5937,
                             longitude: profile.longitude || 78.9629,
                             avatarUrl: profile.avatar_url || fbUser.photoURL || undefined,
-                            phoneNumber: profile.id
+                            phoneNumber: profile.id,
+                            about: profile.about || undefined,
+                            location: profile.location || undefined,
+                            last_login: profile.last_login || undefined,
+                            expert_status: profile.expert_status || 'none',
+                            follower_count: profile.follower_count || 0,
+                            following_count: profile.following_count || 0,
+                            like_count: profile.like_count || 0,
                         });
-                        localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify(profile));
+                        localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify({ ...profile, role: finalRole }));
+                        
+                        // Clear pending data if sync succeeded
+                        if (pendingSignupData.current) {
+                            logger.info(`[Auth] Pending signup data cleared for ${idForDb}`);
+                            pendingSignupData.current = null;
+                        }
                         
                         // ── Global E2E Key initialization ──
                         // Ensure user is messageable immediately (user-isolated)
@@ -148,12 +166,14 @@ const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
                         })();
                     } else {
                         // Fallback to local storage if API fails
+                        const isAdminEmail = fbUser.email?.toLowerCase() === 'ksdharanidharan2005@gmail.com';
                         const extra = localData || {};
                         setUser({
                             id: idForDb,
                             username: extra.username || fbUser.email?.split('@')[0] || fbUser.phoneNumber || 'User',
                             full_name: fbUser.displayName || extra.full_name || 'Agri User',
-                            role: extra.role || 'CUSTOMER',
+                            role: isAdminEmail ? 'ADMIN' : (extra.role || 'BUYER'),
+                            email: fbUser.email || undefined,
                             farm_name: extra.farm_name || 'My Farm',
                             latitude: extra.latitude || 20.5937,
                             longitude: extra.longitude || 78.9629,
@@ -163,13 +183,15 @@ const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
                     }
                 } catch (error) {
                     logger.error("Error syncing profile from Postgres", error);
+                    const isAdminEmail = fbUser.email?.toLowerCase() === 'ksdharanidharan2005@gmail.com';
                     const stored = localStorage.getItem(`${USER_DATA_KEY}_${idForDb}`);
                     const extra = stored ? JSON.parse(stored) : {};
                     setUser({
                         id: idForDb,
                         username: extra.username || fbUser.email?.split('@')[0] || fbUser.phoneNumber || 'User',
                         full_name: fbUser.displayName || extra.full_name || 'Agri User',
-                        role: extra.role || 'CUSTOMER',
+                        role: isAdminEmail ? 'ADMIN' : (extra.role || 'BUYER'),
+                        email: fbUser.email || undefined,
                         farm_name: extra.farm_name || 'My Farm',
                         latitude: extra.latitude || 20.5937,
                         longitude: extra.longitude || 78.9629,
@@ -208,6 +230,8 @@ const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
                 phoneNumber: phoneNumber // Save as a regular field
             };
 
+            // Set pending data BEFORE local storage, to be absolutely sure the effect sees it
+            pendingSignupData.current = userData;
             localStorage.setItem(`${USER_DATA_KEY}_${idForDb}`, JSON.stringify(userData));
             // Note: Postgres sync happens automatically via the onAuthStateChanged effect
         } catch (error: any) {
@@ -254,6 +278,7 @@ const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
                 role,
                 createdAt: new Date().toISOString()
             };
+            pendingSignupData.current = userData;
             localStorage.setItem(`${USER_DATA_KEY}_${userData.id}`, JSON.stringify(userData));
         } catch (error: any) {
             throw new Error(getAuthErrorMessage(error));

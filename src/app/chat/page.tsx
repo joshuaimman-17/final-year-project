@@ -119,6 +119,8 @@ function ChatContent() {
     const [restoring, setRestoring] = useState(false);
     const [serverHasBackup, setServerHasBackup] = useState(false);
     const [pendingKeyGeneration, setPendingKeyGeneration] = useState<any>(null);
+    const [viewingProfile, setViewingProfile] = useState<any>(null);
+    const [profileLoading, setProfileLoading] = useState(false);
     const { showToast } = useToast();
 
     const getValidToken = async (): Promise<string | null> => {
@@ -246,6 +248,34 @@ function ChatContent() {
             setShowRecoverySetup(false);
         } finally {
             setRestoring(false);
+        }
+    };
+
+    const fetchUserProfile = async (userId: string) => {
+        console.log(`[Chat] Fetching profile for user: ${userId}`);
+        window.alert(`Checking profile for user ID: ${userId}`); // Debug Alert
+        showToast("Fetching user profile...", "info");
+        setProfileLoading(true);
+        try {
+            const token = await getValidToken();
+            const res = await fetch(`/api/users/${userId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                console.log(`[Chat] Profile data successfully received for ${userId}:`, data);
+                showToast(`Profile loaded: ${data.full_name || data.username}`, "success");
+                setViewingProfile(data);
+            } else {
+                const errorText = await res.text();
+                console.error(`[Chat] Profile fetch failed for ${userId}. Status: ${res.status}, Body: ${errorText}`);
+                showToast(`Failed to load profile: ${res.status}`, "error");
+            }
+        } catch (e) {
+            console.error("[Chat] Profile fetch failed", e);
+            showToast("Error loading profile", "error");
+        } finally {
+            setProfileLoading(false);
         }
     };
 
@@ -519,7 +549,7 @@ function ChatContent() {
                     {selectedUser && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginLeft: 6 }}>
                             {getAvatar(selectedUser, 40)}
-                            <div>
+                            <div style={{ cursor: 'pointer' }} onClick={() => fetchUserProfile(selectedUser.id)}>
                                 <div style={{ fontWeight: 700, fontSize: 16 }}>{selectedUser.full_name || selectedUser.username}</div>
                                 <div style={{ fontSize: 11, opacity: 0.8, display: 'flex', alignItems: 'center', gap: 5 }}>
                                     <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#2ecc71', boxShadow: '0 0 8px #2ecc71' }} />
@@ -550,6 +580,17 @@ function ChatContent() {
                             <Icon name="lock_reset" style={{ fontSize: 22 }} />
                         </button>
                     )}
+                    <button 
+                        onClick={() => {
+                            setViewingProfile(null);
+                            setProfileLoading(false);
+                            window.alert("Profile State Reset!");
+                        }}
+                        title="Debug: Reset Profile State"
+                        style={{ background: 'rgba(255,100,100,0.3)', border: 'none', color: '#fff', padding: 8, borderRadius: 12, cursor: 'pointer' }}
+                    >
+                        <Icon name="bug_report" style={{ fontSize: 22 }} />
+                    </button>
                     <button style={{ background: 'none', border: 'none', color: '#fff', opacity: 0.8, cursor: 'pointer' }}>
                         <Icon name="more_vert" style={{ fontSize: 24 }} />
                     </button>
@@ -566,6 +607,7 @@ function ChatContent() {
                     search={search}
                     onSearchChange={setSearch}
                     getCurrentUserId={getCurrentUserId}
+                    onViewProfile={fetchUserProfile}
                 />
 
                 {/* ── MAIN CHAT AREA ── */}
@@ -673,6 +715,7 @@ function ChatContent() {
                                             selectedUser={selectedUser}
                                             formatTime={formatTime}
                                             onRestoreRequest={() => setShowRestoreModal(true)}
+                                            onViewProfile={fetchUserProfile}
                                         />
                                     );
                                 })
@@ -846,13 +889,148 @@ function ChatContent() {
                     </div>
                 </div>
             )}
+            {/* ── USER PROFILE MODAL ── */}
+            {viewingProfile && (
+                <div style={{
+                    position: 'fixed', inset: 0, 
+                    background: 'rgba(0,0,0,0.8)', 
+                    backdropFilter: 'blur(10px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', 
+                    zIndex: 9999, 
+                    padding: 20,
+                    animation: 'fadeIn 0.3s ease'
+                }} onClick={() => setViewingProfile(null)}>
+                    <div style={{
+                        background: '#fff', borderRadius: '28px', width: '100%', maxWidth: 400,
+                        overflow: 'hidden', boxShadow: '0 30px 60px rgba(0,0,0,0.4)',
+                        animation: 'scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)'
+                    }} onClick={e => e.stopPropagation()}>
+                        
+                        <div style={{ height: 120, background: 'linear-gradient(135deg, #1a6b3a 0%, #27ae60 100%)', position: 'relative' }}>
+                            <button 
+                                onClick={() => setViewingProfile(null)}
+                                style={{
+                                    position: 'absolute', top: 15, right: 15, background: 'rgba(255,255,255,0.2)',
+                                    border: 'none', color: '#fff', borderRadius: '50%', width: 32, height: 32,
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                                }}
+                            >
+                                <Icon name="close" style={{ fontSize: 20 }} />
+                            </button>
+                        </div>
+                        
+                        <div style={{ padding: '0 30px 40px', marginTop: -50, textAlign: 'center' }}>
+                            <div style={{ 
+                                width: 100, height: 100, borderRadius: '50%', border: '5px solid #fff',
+                                margin: '0 auto', overflow: 'hidden', background: '#e8f5e9',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                boxShadow: '0 8px 20px rgba(0,0,0,0.1)'
+                            }}>
+                                {viewingProfile.avatar_url ? (
+                                    <img src={viewingProfile.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                ) : (
+                                    <span style={{ fontSize: 40, fontWeight: 800, color: '#27ae60' }}>
+                                        {viewingProfile.full_name?.charAt(0) || viewingProfile.username?.charAt(0)}
+                                    </span>
+                                )}
+                            </div>
+                            
+                            <h3 style={{ marginTop: 16, marginBottom: 4, fontWeight: 800, fontSize: 22, color: '#1a2e1e' }}>
+                                {viewingProfile.full_name}
+                            </h3>
+                            <p style={{ color: '#27ae60', fontWeight: 700, fontSize: 14, marginBottom: 20 }}>@{viewingProfile.username}</p>
+                            
+                            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginBottom: 25, flexWrap: 'wrap' }}>
+                                <span style={{
+                                    background: viewingProfile.role === 'ADMIN' ? '#ffebee' : viewingProfile.role === 'EXPERT' ? '#e1f5fe' : '#e8f5e9',
+                                    color: viewingProfile.role === 'ADMIN' ? '#d32f2f' : viewingProfile.role === 'EXPERT' ? '#0288d1' : '#2e7d32',
+                                    padding: '8px 16px', borderRadius: '14px', fontSize: 11, fontWeight: 800,
+                                    textTransform: 'uppercase', letterSpacing: 0.5,
+                                    display: 'flex', alignItems: 'center', gap: 6,
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                                }}>
+                                    <Icon name={viewingProfile.role === 'ADMIN' ? 'shield' : viewingProfile.role === 'EXPERT' ? 'verified' : 'person'} style={{ fontSize: 14 }} />
+                                    {viewingProfile.role === 'ADMIN' ? 'Administrator' : viewingProfile.role === 'EXPERT' ? 'Agri Expert' : 'Citizen Farmer'}
+                                </span>
+                                <span style={{
+                                    background: '#f0f2f0', color: '#555', padding: '8px 16px',
+                                    borderRadius: '14px', fontSize: 11, fontWeight: 800,
+                                    display: 'flex', alignItems: 'center', gap: 6
+                                }}>
+                                    <Icon name="calendar_today" style={{ fontSize: 13 }} />
+                                    Joined {new Date(viewingProfile.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                                </span>
+                            </div>
+                            
+                            <div style={{ 
+                                background: '#f8faf8', borderRadius: '20px', padding: '20px',
+                                display: 'flex', justifyContent: 'space-around', border: '1px solid #edf2ed'
+                            }}>
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ fontWeight: 800, fontSize: 18, color: '#1a2e1e' }}>{viewingProfile.follower_count || 0}</div>
+                                    <div style={{ fontSize: 12, color: '#888', fontWeight: 600 }}>Followers</div>
+                                </div>
+                                <div style={{ width: 1, background: '#e0e6e0' }} />
+                                <div style={{ textAlign: 'center' }}>
+                                    <div style={{ fontWeight: 800, fontSize: 18, color: '#1a2e1e' }}>{(viewingProfile.about?.length > 0) ? 'Active' : 'N/A'}</div>
+                                    <div style={{ fontSize: 12, color: '#888', fontWeight: 600 }}>Status</div>
+                                </div>
+                            </div>
+                            
+                            {viewingProfile.about && (
+                                <div style={{ marginTop: 25, textAlign: 'left', overflowY: 'auto', maxHeight: '100px' }}>
+                                    <h4 style={{ fontSize: 12, fontWeight: 800, color: '#888', textTransform: 'uppercase', marginBottom: 10, letterSpacing: 1 }}>About</h4>
+                                    <p style={{ fontSize: 14, color: '#555', lineHeight: 1.6, fontWeight: 500 }}>{viewingProfile.about}</p>
+                                </div>
+                            )}
+                            
+                            <div style={{ marginTop: 35, display: 'flex', gap: 12 }}>
+                                <button 
+                                    onClick={() => setViewingProfile(null)}
+                                    style={{
+                                        flex: 1, padding: '14px', borderRadius: '16px', border: 'none',
+                                        background: '#27ae60', color: '#fff', fontWeight: 800, cursor: 'pointer',
+                                        boxShadow: '0 8px 20px rgba(39,174,96,0.3)', transition: 'all 0.2s'
+                                    }}
+                                >
+                                    Close Profile
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Profile Loading Overlay */}
+            {profileLoading && (
+                <div style={{
+                    position: 'fixed', inset: 0, zIndex: 1200, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: 'rgba(255,255,255,0.4)', backdropFilter: 'blur(4px)'
+                }}>
+                    <div style={{ width: 40, height: 40, border: '4px solid #e8f5e9', borderTopColor: '#27ae60', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                </div>
+            )}
+
+            <style jsx>{`
+                @keyframes scaleUp {
+                    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+                    to { opacity: 1; transform: scale(1) translateY(0); }
+                }
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes spin {
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 }
 
 export default function ChatPage() {
     return (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['FARMER', 'EXPERT', 'ADMIN']}>
             <ChatContent />
         </ProtectedRoute>
     );

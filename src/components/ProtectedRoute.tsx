@@ -4,16 +4,35 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 
-export default function ProtectedRoute({ children }: { children: React.ReactNode }) {
+import { UserRole } from "@/types";
+
+interface ProtectedRouteProps {
+    children: React.ReactNode;
+    allowedRoles?: UserRole[];
+}
+
+export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
     const { user, loading } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
 
     useEffect(() => {
-        if (!loading && !user) {
-            router.push("/login");
+        if (!loading) {
+            if (!user) {
+                router.push("/login");
+            } else if (allowedRoles && !allowedRoles.includes(user.role)) {
+                // Redirect unauthorized users to their respective dashboards
+                const role = user.role?.toUpperCase();
+                switch (role) {
+                    case 'ADMIN': router.replace('/admin/dashboard'); break;
+                    case 'FARMER': router.replace('/farmer/dashboard'); break;
+                    case 'EXPERT': router.replace('/expert/dashboard'); break;
+                    case 'BUYER': router.replace('/marketplace'); break;
+                    default: router.replace('/');
+                }
+            }
         }
-    }, [user, loading, router]);
+    }, [user, loading, router, allowedRoles]);
 
     if (loading) {
         return (
@@ -26,6 +45,7 @@ export default function ProtectedRoute({ children }: { children: React.ReactNode
     }
 
     if (!user) return null;
+    if (allowedRoles && !allowedRoles.includes(user.role)) return null;
 
     return <>{children}</>;
 }

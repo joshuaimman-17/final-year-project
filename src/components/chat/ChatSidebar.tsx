@@ -10,6 +10,7 @@ interface ChatSidebarProps {
     search: string;
     onSearchChange: (value: string) => void;
     getCurrentUserId: () => string | null;
+    onViewProfile: (userId: string) => void;
 }
 
 export const ChatSidebar: React.FC<ChatSidebarProps> = ({
@@ -18,16 +19,28 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
     onSelectUser,
     search,
     onSearchChange,
-    getCurrentUserId
+    getCurrentUserId,
+    onViewProfile
 }) => {
     const getAvatar = (u: any, size = 46) => {
+        const onClickAvatar = (e: React.MouseEvent) => {
+            e.stopPropagation();
+            onViewProfile(u.id);
+        };
+
         if (u?.avatar_url) {
-            return <img src={u.avatar_url} alt="" className="rounded-circle object-fit-cover" style={{ width: size, height: size }} />;
+            return (
+                <div onClick={onClickAvatar} style={{ cursor: 'pointer' }}>
+                    <img src={u.avatar_url} alt="" className="rounded-circle object-fit-cover" style={{ width: size, height: size }} />
+                </div>
+            );
         }
         const letter = u?.full_name?.charAt(0) || u?.username?.charAt(0) || '?';
         return (
-            <div className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white bg-success"
-                style={{ width: size, height: size, fontSize: size * 0.4 }}>
+            <div 
+                onClick={onClickAvatar}
+                className="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white bg-success"
+                style={{ width: size, height: size, fontSize: size * 0.4, cursor: 'pointer' }}>
                 {letter.toUpperCase()}
             </div>
         );
@@ -124,9 +137,22 @@ export const ChatSidebar: React.FC<ChatSidebarProps> = ({
                                     }}>
                                         <div style={{ 
                                             fontWeight: 700, fontSize: 15, color: '#1a2e1e', 
-                                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' 
+                                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                                            display: 'flex', alignItems: 'center', gap: 6
                                         }}>
                                             {u.full_name || u.username}
+                                            <div 
+                                                onClick={(e) => { 
+                                                    e.stopPropagation(); 
+                                                    console.log(`[DEBUG] Profile Clicked for: ${u.id}`);
+                                                    window.alert(`TRIGGERING PROFILE FOR: ${u.full_name || u.username}`);
+                                                    onViewProfile(u.id); 
+                                                }}
+                                                style={{ color: '#27ae60', opacity: 0.6, cursor: 'pointer', padding: '4px' }}
+                                                title="View Profile"
+                                            >
+                                                <Icon name="info" style={{ fontSize: 16 }} />
+                                            </div>
                                         </div>
                                         <span style={{ fontSize: 11, color: '#aaa' }}>12:45 PM</span>
                                     </div>

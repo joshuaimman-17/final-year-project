@@ -7,6 +7,7 @@ import { useWeatherData } from '@/hooks/useWeatherData';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, YAxis } from 'recharts';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { BottomNav } from '@/components/BottomNav';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 // ── Default fallback (only used if geolocation fully denied/unavailable) ─────
@@ -132,7 +133,9 @@ function useGeolocation() {
 
 // ─────────────────────────────────────────────────────────────────────────────
 function DashboardContent() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const router = useRouter();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
   const [mounted, setMounted] = useState(false);
   const { coords, geoLoading, geoError, showPromptBanner, requestPermission, dismissPrompt, recenter } = useGeolocation();
@@ -143,12 +146,22 @@ function DashboardContent() {
 
   const { data, loading, error } = useWeatherData(lat, lon);
 
-  useEffect(() => {
-    setMounted(true);
-    setCurrentTime(new Date());
-    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
-    return () => clearInterval(timer);
-  }, []);
+  // ── ROLE DEFINITIONS ──
+  const userEmail = user?.email?.toLowerCase();
+  const userRole = user?.role?.toUpperCase();
+  const isAdmin = userEmail === 'ksdharanidharan2005@gmail.com' || userRole === 'ADMIN';
+  const isExpert = userRole === 'EXPERT';
+
+    useEffect(() => {
+      setMounted(true);
+      setCurrentTime(new Date());
+      const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+      
+      // Removed automatic redirection to allow admins/experts to view the home page.
+      // Navigation to dashboards is now handled via header buttons.
+
+      return () => clearInterval(timer);
+    }, [user, router, isAdmin, isExpert, loading, mounted]);
 
   if (!mounted || !currentTime) return null;
 
@@ -157,7 +170,7 @@ function DashboardContent() {
       <div className="spinner-border text-success mb-3" role="status">
         <span className="visually-hidden">Loading…</span>
       </div>
-      <p className="text-muted fw-medium">Fetching Live Satellite Data…</p>
+      <p className="text-muted fw-medium">Optimizing Dashboard for your Role…</p>
     </div>
   );
 
@@ -211,6 +224,16 @@ function DashboardContent() {
     return "Conditions are ideal for crop growth.";
   };
 
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch (err) {
+      console.error("Logout failed", err);
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <div className="d-flex flex-column min-vh-100 pb-5">
 
@@ -229,18 +252,45 @@ function DashboardContent() {
               <h1 className="h6 mb-0 fw-bold text-dark">
                 {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
               </h1>
+              <div style={{ fontSize: '8px', opacity: 0.5, marginTop: 2 }}>
+                ROLE: {user?.role || 'NONE'} | EMAIL: {user?.email || 'MISSING'} | ID: {user?.id?.substring(0, 8)}...
+              </div>
             </div>
           </div>
 
-          {/* GPS status */}
-          <div className={`d-flex align-items-center gap-2 small px-3 py-2 rounded-pill shadow-sm
-            ${geoLoading ? 'bg-warning-subtle text-warning' : geoError ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}`}>
-            <span className={`d-inline-block rounded-circle
-              ${geoLoading ? 'bg-warning' : geoError ? 'bg-danger' : 'bg-success'}`}
-              style={{ width: '8px', height: '8px', animation: geoLoading ? 'none' : geoError ? 'none' : 'pulse 1.5s infinite' }} />
-            <span className="fw-bold">
-              {geoLoading ? 'Locating…' : geoError ? 'GPS Off' : 'Live GPS'}
-            </span>
+          <div className="d-flex align-items-center gap-3">
+            {/* GPS status */}
+            <div className={`d-flex align-items-center gap-2 small px-3 py-2 rounded-pill shadow-sm
+              ${geoLoading ? 'bg-warning-subtle text-warning' : geoError ? 'bg-danger-subtle text-danger' : 'bg-success-subtle text-success'}`}>
+              <span className={`d-inline-block rounded-circle
+                ${geoLoading ? 'bg-warning' : geoError ? 'bg-danger' : 'bg-success'}`}
+                style={{ width: '8px', height: '8px', animation: geoLoading ? 'none' : geoError ? 'none' : 'pulse 1.5s infinite' }} />
+              <span className="fw-bold">
+                {geoLoading ? 'Locating…' : geoError ? 'GPS Off' : 'Live GPS'}
+              </span>
+            </div>
+
+            {(user?.role?.toUpperCase() === 'ADMIN' || user?.email?.toLowerCase() === 'ksdharanidharan2005@gmail.com') && (
+              <button 
+                onClick={() => router.push('/admin/dashboard')}
+                className="btn btn-danger btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center gap-2 fw-bold"
+                style={{ fontSize: '11px', animation: 'pulse 2s infinite', border: '2px solid #fff' }}
+              >
+                <Icon name="admin_panel_settings" style={{ fontSize: '14px' }} />
+                Admin Panel
+              </button>
+            )}
+
+            {user?.role?.toUpperCase() === 'EXPERT' && (
+              <button 
+                onClick={() => router.push('/expert/dashboard')}
+                className="btn btn-success btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center gap-2 fw-bold"
+                style={{ fontSize: '11px', animation: 'pulse 2s infinite', border: '2px solid #fff' }}
+              >
+                <Icon name="psychology" style={{ fontSize: '14px' }} />
+                Expert Panel
+              </button>
+            )}
           </div>
         </div>
       </header>

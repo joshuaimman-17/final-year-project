@@ -509,7 +509,7 @@ function MarketplaceContent() {
 
 export default function MarketplacePage() {
     return (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['BUYER', 'FARMER', 'ADMIN']}>
             <MarketplaceContent />
         </ProtectedRoute>
     );

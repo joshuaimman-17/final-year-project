@@ -1,0 +1,48 @@
+{
+  "specificUsers": [
+    {
+      "id": "PW5uhwL0y8NwBO3Mgd0Ul4AJcOA3",
+      "email": "projectplant3@gmail.com",
+      "username": "projectplant3",
+      "full_name": "Dharanidharan ",
+      "role": "EXPERT"
+    },
+    {
+      "id": "BHSIP7YMSHUv1FIQ8XH9R0eMMfz1",
+      "email": "dharanidharan2005edu@gmail.com",
+      "username": "dharanidharan2005edu",
+      "full_name": "Dharanidharan",
+      "role": "FARMER"
+    },
+    {
+      "id": "Tf6po6eWbKW1rhvdZDp8aASbVOU2",
+      "email": "dr.plant2026@gmail.com",
+      "username": "dr.plant2026",
+      "full_name": "joshua",
+      "role": "BUYER"
+    },
+    {
+      "id": "EIHtySfVn6fljVZ2bfIbquIKmda2",
+      "email": "joshuaimman8@gmail.com",
+      "username": "joshuaimman8",
+      "full_name": "Joshva",
+      "role": "BUYER"
+    }
+  ],
+  "nameMatches": [
+    {
+      "id": "c2U2eQH218eF8qV7lZ0S1JW2YqN2",
+      "email": "ksdharanidharan2005@gmail.com",
+      "username": "ksdharanidharan2005",
+      "full_name": "Dharanidharan",
+      "role": "ADMIN"
+    },
+    {
+      "id": "7C1a9rWXCNboFVpAfz053Sy8JEr2",
+      "email": "joshuaimman2004@gmail.com",
+      "username": "joshuaimman2004",
+      "full_name": "Joshua Immanuel",
+      "role": "BUYER"
+    }
+  ]
+}

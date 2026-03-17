@@ -1,9 +1,8 @@
-
-export type UserRole = 'FARMER' | 'EXPERT' | 'ADMIN';
+export type UserRole = 'FARMER' | 'EXPERT' | 'ADMIN' | 'BUYER';
 
 export interface User {
     _id?: string;
-    id?: string;
+    id: string;
     username: string;
     full_name: string;
     role: UserRole;
@@ -11,8 +10,15 @@ export interface User {
     latitude: number;
     longitude: number;
     avatarUrl?: string;
+    email?: string;
     location?: string;
     phoneNumber?: string;
+    about?: string;
+    last_login?: string;
+    follower_count?: number;
+    following_count?: number;
+    like_count?: number;
+    expert_status?: 'none' | 'pending' | 'approved' | 'denied';
 }
 
 export interface TelemetryData {
@@ -145,4 +151,18 @@ export interface MandiPrice {
     min_price: number;
     max_price: number;
     avg_price: number;
+}
+export interface CartItem extends Product {
+    quantity: number;
+}
+
+export interface Order {
+    id: string;
+    items: CartItem[];
+    total: number;
+    status: 'pending' | 'shipped' | 'delivered' | 'cancelled';
+    created_at: string | Date;
+    customer_id: string;
+    customer_name: string;
+    shipping_address?: string;
 }

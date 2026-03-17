@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ToastProvider } from "@/context/ToastContext";
+import { CartProvider } from "@/context/CartContext";
 import BootstrapClient from "@/components/BootstrapClient";
 
 const inter = Inter({
@@ -73,9 +74,11 @@ export default function RootLayout({
       <body className={`${inter.variable} antialiased`}>
         <AuthProvider>
           <ToastProvider>
-            <div className="bg-light min-vh-100">
-              {children}
-            </div>
+            <CartProvider>
+              <div className="bg-light min-vh-100">
+                {children}
+              </div>
+            </CartProvider>
           </ToastProvider>
         </AuthProvider>
         <BootstrapClient />

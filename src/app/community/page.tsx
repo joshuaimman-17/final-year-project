@@ -111,7 +111,7 @@ function CommunityContent() {
 
 export default function CommunityPage() {
     return (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['FARMER', 'EXPERT', 'ADMIN']}>
             <CommunityContent />
         </ProtectedRoute>
     );

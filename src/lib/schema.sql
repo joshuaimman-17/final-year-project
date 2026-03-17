@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT,
     username TEXT NOT NULL UNIQUE,
     full_name TEXT,
-    role TEXT NOT NULL DEFAULT 'CUSTOMER', -- 'CUSTOMER', 'FRAMER', 'EXPERT'
+    role TEXT NOT NULL DEFAULT 'BUYER', -- 'BUYER', 'FARMER', 'EXPERT', 'ADMIN'
     farm_name TEXT,
     location TEXT,
     latitude DECIMAL(10, 8),

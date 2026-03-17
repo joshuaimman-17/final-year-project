@@ -1,0 +1,37 @@
+{
+  "chat_messages": [
+    "created_at",
+    "encrypted_content",
+    "id",
+    "receiver_id",
+    "sender_id"
+  ],
+  "expert_requests": [
+    "created_at",
+    "experience",
+    "id",
+    "message",
+    "portfolio_link",
+    "skills",
+    "status",
+    "user_id"
+  ],
+  "user_public_keys": [
+    "public_key",
+    "updated_at",
+    "user_id"
+  ],
+  "users": [
+    "avatar_url",
+    "created_at",
+    "email",
+    "expert_status",
+    "farm_name",
+    "full_name",
+    "id",
+    "location",
+    "phone_number",
+    "role",
+    "username"
+  ]
+}

@@ -251,7 +251,7 @@ function FieldContent() {
 
 export default function FieldPage() {
     return (
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['FARMER', 'EXPERT', 'ADMIN']}>
             <FieldContent />
         </ProtectedRoute>
     );

@@ -11,6 +11,7 @@ interface MessageBubbleProps {
     selectedUser: any;
     formatTime: (ts: any) => string;
     onRestoreRequest?: () => void;
+    onViewProfile: (userId: string) => void;
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -20,7 +21,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     getAvatar,
     selectedUser,
     formatTime,
-    onRestoreRequest
+    onRestoreRequest,
+    onViewProfile
 }) => {
     const isUndecryptable = message.text?.includes("Unable to decrypt");
 
@@ -35,7 +37,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         }}>
             {/* Avatar for receiver */}
             {!isMe && (
-                <div style={{ width: 32, flexShrink: 0, marginBottom: 2 }}>
+                <div 
+                    style={{ width: 32, flexShrink: 0, marginBottom: 2, cursor: 'pointer' }}
+                    onClick={() => onViewProfile(selectedUser.id)}
+                >
                     {showAvatar ? getAvatar(selectedUser, 32) : null}
                 </div>
             )}
