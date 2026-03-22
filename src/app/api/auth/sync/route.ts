@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import neonSql from '@/lib/neon';
 import { verifyAuth } from '@/lib/authHelper';
+import fs from 'fs';
+import path from 'path';
 
-const ADMIN_EMAIL = 'ksdharanidharan2005@gmail.com';
+// ✅ Add any admin emails here — these will always get the ADMIN role on login
+const ADMIN_EMAILS: string[] = [
+    'ksdharanidharan2005@gmail.com',
+    'dr.plant2026@gmail.com',
+];
 
 export async function POST(req: NextRequest) {
     const decodedToken = await verifyAuth(req);
@@ -10,134 +16,133 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
+    const { uid, email, name: fbName, picture } = decodedToken;
+    const userId = uid;
+
     try {
-        const { uid, email, name, picture, phone_number } = decodedToken;
-        const body = await req.json();
+        let body: any = {};
+        try {
+            body = await req.json();
+        } catch (e) {}
 
-        const userId = phone_number || uid;
+        const isAdminEmail = ADMIN_EMAILS.includes(email?.toLowerCase() || '');
+        
+        // Extract extra fields from body
+        const farmName = body.farm_name || body.farmName || null;
+        const lat = body.latitude || 20.5937;
+        const lon = body.longitude || 78.9629;
 
-        const full_name = body.full_name || null;
-        const farm_name = body.farm_name || null;
-        const location = body.location || null;
-        const latitude = body.latitude || null;
-        const longitude = body.longitude || null;
-        const avatar_url = picture || null;
-        const username = body.username || null;
-        const about = body.about || null;
+        console.log(`[Sync] Syncing user: ${email || userId}, isAdmin: ${isAdminEmail}, Farm: ${farmName}`);
 
-        // ── ADMIN EMAIL ENFORCEMENT ──
-        const isAdminEmail = email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-        console.log(`[Sync] Processing sync for ${email || 'no email'}, isAdminEmail: ${isAdminEmail}`);
-        const roleForNewUser = isAdminEmail ? 'ADMIN' : (body.role || 'BUYER');
-        console.log(`[Sync] Derived role: ${roleForNewUser}`);
-
+        // Try to find user by id
         let existingUsers = await neonSql`SELECT * FROM users WHERE id = ${userId}`;
 
+        // Healing: If not found by ID, try email (for legacy transitions)
         if (existingUsers.length === 0 && email) {
             const byEmail = await neonSql`SELECT * FROM users WHERE email = ${email}`;
             if (byEmail.length > 0) {
-                console.log(`[Sync] Healing ID transition for ${email}: ${byEmail[0].id} -> ${userId}`);
-                await neonSql`UPDATE user_public_keys SET user_id = ${userId} WHERE user_id = ${byEmail[0].id}`;
-                await neonSql`UPDATE users SET id = ${userId} WHERE id = ${byEmail[0].id}`;
+                console.log(`[Sync] Updating ID for legacy email user ${email}`);
+                await neonSql`UPDATE users SET id = ${userId} WHERE email = ${email}`;
                 existingUsers = await neonSql`SELECT * FROM users WHERE id = ${userId}`;
             }
         }
 
-        const existingUser = existingUsers[0];
         let finalUser;
+        if (existingUsers.length > 0) {
+            const user = existingUsers[0];
+            // Trust the existing DB role UNLESS we're overriding with admin email list
+            // This allows admins set via DB script to keep their role on re-login
+            const preservedRole = isAdminEmail
+                ? 'ADMIN'
+                : user.role === 'ADMIN'
+                    ? 'BUYER'  // non-admin-email users cannot keep ADMIN role
+                    : (user.role || 'BUYER');
 
-        if (existingUser) {
-            try {
-                const new_full_name = full_name ?? existingUser.full_name;
-                const new_username = username ?? existingUser.username;
-                const new_about = about ?? existingUser.about;
-                const new_farm_name = farm_name ?? existingUser.farm_name;
-                const new_location = location ?? existingUser.location;
-                const new_avatar_url = avatar_url ?? existingUser.avatar_url;
-                // ── ROLE LOGIC ──
-                let new_role = existingUser.role;
-                if (isAdminEmail) {
-                    new_role = 'ADMIN'; // admin email always gets ADMIN
-                } else if (!existingUser.role || existingUser.role === 'BUYER' || existingUser.role === 'CUSTOMER') {
-                    // Allow updating from basic/legacy role if a role is provided in the sync request
-                    if (body.role) {
-                        new_role = body.role;
-                    }
-                }
-                // otherwise keep existingUser.role as-is (e.g., don't downgrade EXPERT/FARMER)
-
-                const updatedUsers = await neonSql`
-                    UPDATE users 
-                    SET 
-                        full_name = ${new_full_name},
-                        username = ${new_username},
-                        about = ${new_about},
-                        farm_name = ${new_farm_name},
-                        location = ${new_location},
-                        avatar_url = ${new_avatar_url},
-                        role = ${new_role},
-                        last_login = NOW()
-                    WHERE id = ${userId}
-                    RETURNING *
-                `;
-                finalUser = updatedUsers[0];
-            } catch (updateErr: any) {
-                if (updateErr.code === '23505') {
-                    return NextResponse.json({ message: 'Username already taken' }, { status: 409 });
-                }
-                throw updateErr;
-            }
+            const updatedUsers = await neonSql`
+                UPDATE users 
+                SET 
+                    full_name = ${fbName || user.full_name || 'Agri User'},
+                    avatar_url = ${picture || user.avatar_url || ''},
+                    role = ${preservedRole},
+                    farm_name = ${farmName || user.farm_name || null},
+                    latitude = ${lat},
+                    longitude = ${lon}
+                WHERE id = ${userId}
+                RETURNING *
+            `;
+            finalUser = updatedUsers[0];
         } else {
-            // Create new user - Resilience: provide fallback for username/role if missing (orphaned users)
-            const finalUsername = username || email?.split('@')[0] || `user_${userId.slice(-5)}`;
-            console.log(`[Sync] Creating missing record for ${email || userId}. Derived username: ${finalUsername}, role: ${roleForNewUser}`);
-
-            try {
-                const newUsers = await neonSql`
-                    INSERT INTO users (id, email, username, full_name, role, farm_name, location, avatar_url, last_login)
-                    VALUES (
-                        ${userId}, 
-                        ${email || null}, 
-                        ${finalUsername}, 
-                        ${full_name || name || 'Agri User'}, 
-                        ${roleForNewUser},
-                        ${farm_name || 'My Farm'}, 
-                        ${location || ''}, 
-                        ${avatar_url || ''},
-                        NOW()
-                    )
-                    RETURNING *
-                `;
-                finalUser = newUsers[0];
-            } catch (createErr: any) {
-                if (createErr.code === '23505') {
-                    return NextResponse.json({ message: 'Username already taken' }, { status: 409 });
-                }
-                throw createErr;
+            console.log(`[Sync] Creating new user: ${email || userId}`);
+            let defaultRole = body.role?.toUpperCase() || 'BUYER';
+            if (defaultRole === 'ADMIN' && !isAdminEmail) {
+                defaultRole = 'BUYER';
             }
+            if (isAdminEmail) defaultRole = 'ADMIN';
+
+            const defaultUsername = body.username || email?.split('@')[0] || `user_${userId.slice(-5)}`;
+            
+            const newUsers = await neonSql`
+                INSERT INTO users (id, email, username, full_name, avatar_url, role, farm_name, latitude, longitude)
+                VALUES (
+                    ${userId}, 
+                    ${email || null}, 
+                    ${defaultUsername}, 
+                    ${fbName || 'Agri User'}, 
+                    ${picture || ''}, 
+                    ${defaultRole},
+                    ${farmName},
+                    ${lat},
+                    ${lon}
+                )
+                RETURNING *
+            `;
+            finalUser = newUsers[0];
         }
 
-        // Fetch Social Stats
-        const [followerRes, followingRes, likesRes] = await Promise.all([
-            neonSql`SELECT COUNT(*) as count FROM followers WHERE following_id = ${userId}`,
-            neonSql`SELECT COUNT(*) as count FROM followers WHERE follower_id = ${userId}`,
-            neonSql`SELECT COUNT(*) as count FROM expert_likes WHERE expert_id = ${userId}`
-        ]);
+        // Fetch follow counts
+        let follower_count = 0;
+        let following_count = 0;
+        try {
+            // Note: We avoid creating tables inside the GET/POST handlers for performance and safety.
+            // If the table is missing, the catch block handles it by defaulting to 0.
+            const followerRes = await neonSql`SELECT COUNT(*) as count FROM follows WHERE followee_id = ${userId}`;
+            follower_count = Number(followerRes[0]?.count || 0);
 
-        const userWithStats = {
-            ...finalUser,
-            follower_count: parseInt(followerRes[0].count),
-            following_count: parseInt(followingRes[0].count),
-            like_count: parseInt(likesRes[0].count)
-        };
+            const followingRes = await neonSql`SELECT COUNT(*) as count FROM follows WHERE follower_id = ${userId}`;
+            following_count = Number(followingRes[0]?.count || 0);
+        } catch (e) {
+            console.warn('[Sync] Follow counts fetch failed (possibly table missing):', e);
+        }
 
+        // Return standardized user object for frontend
         return NextResponse.json({ 
-            user: userWithStats, 
-            message: 'User synced with Postgres' 
+            user: {
+                ...finalUser,
+                follower_count,
+                following_count,
+                // Ensure frontend gets 'id' and 'full_name' as expected by types
+                id: finalUser.id,
+                full_name: finalUser.full_name
+            }, 
+            message: 'Sync successful' 
         });
 
     } catch (err: any) {
-        console.error('Sync Error (Neon):', err);
-        return NextResponse.json({ message: err.message }, { status: 500 });
+        const errorDetail = err.message || String(err);
+        const stack = err.stack || 'No stack trace';
+        
+        try {
+            const logPath = path.join(process.cwd(), 'sync-error.log');
+            const logMessage = `[${new Date().toISOString()}] Sync failure for ${userId}:\nError: ${errorDetail}\nStack: ${stack}\n\n`;
+            fs.appendFileSync(logPath, logMessage);
+        } catch (e) {
+            console.error('Failed to write to sync-error.log', e);
+        }
+
+        console.error(`[Sync] Critical failure for ${userId}:`, err);
+        return NextResponse.json({ 
+            message: 'Internal synchronization error',
+            error: errorDetail
+        }, { status: 500 });
     }
 }

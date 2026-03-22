@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth/context/AuthContext';
 import { Order } from '@/types';
-import { Icon } from '@/components/Icon';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import { BottomNav } from '@/components/BottomNav';
+import { Icon } from '@/components/ui/Icon';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
+import { BottomNav } from '@/components/common/BottomNav';
 import { useRouter } from 'next/navigation';
 
 function OrdersContent() {

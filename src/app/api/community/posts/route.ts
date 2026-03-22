@@ -12,13 +12,24 @@ export async function GET(req: NextRequest) {
         const userId = decodedToken ? (decodedToken.phone_number || decodedToken.uid || null) as string | null : null;
 
         const db = admin.firestore();
-        const postsSnap = await db.collection('community_posts').orderBy('createdAt', 'desc').get();
+        let docs = (await db.collection('community_posts').orderBy('createdAt', 'desc').get()).docs;
+
+        const filter = req.nextUrl.searchParams.get('filter');
+        if (filter === 'following' && userId) {
+            const { default: neonSql } = await import('@/lib/neon');
+            const followRows = await neonSql`SELECT followee_id FROM follows WHERE follower_id = ${userId}`;
+            const followeeIds = followRows.map(r => r.followee_id);
+            if (followeeIds.length === 0) {
+                return NextResponse.json([]);
+            }
+            docs = docs.filter(doc => followeeIds.includes(doc.data().authorId));
+        }
 
         // Perform lookups if we have a userId
         let userLikes = new Set<string>();
         if (userId) {
             // Find all like docs for this user matching these posts
-            const docRefs = postsSnap.docs.map(doc => db.collection('post_likes').doc(`${doc.id}_${userId}`));
+            const docRefs = docs.map(doc => db.collection('post_likes').doc(`${doc.id}_${userId}`));
 
             if (docRefs.length > 0) {
                 // Batch fetch (getAll supports up to 100 max, but typically we want to loop if > 100 limits, 
@@ -26,13 +37,13 @@ export async function GET(req: NextRequest) {
                 const likeDocs = await Promise.all(docRefs.map(ref => ref.get()));
                 likeDocs.forEach((likeDoc, index) => {
                     if (likeDoc.exists) {
-                        userLikes.add(postsSnap.docs[index].id);
+                        userLikes.add(docs[index].id);
                     }
                 });
             }
         }
 
-        const formattedPosts = postsSnap.docs.map(doc => {
+        const formattedPosts = docs.map(doc => {
             const data = doc.data();
             return {
                 id: doc.id,
@@ -58,6 +69,19 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
     try {
+        const decodedToken = await verifyAuth(req);
+        if (!decodedToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
+        const userId = decodedToken.phone_number || decodedToken.uid;
+        
+        // Import neonSql dynamically or ensure it's available. 
+        // We'll use the existing pattern of checking role from Postgres.
+        const { default: neonSql } = await import('@/lib/neon');
+        const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
+        if (!userRole[0] || userRole[0].role === 'BUYER') {
+            return NextResponse.json({ message: 'Forbidden: Buyers cannot post to community' }, { status: 403 });
+        }
+
         const formData = await req.formData();
         const content = formData.get('content') as string;
         const authorId = formData.get('authorId') as string;

@@ -8,6 +8,13 @@ export async function GET(req: NextRequest) {
     if (!decodedToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     const userId = decodedToken.phone_number || decodedToken.uid;
+    
+    // Check role from database
+    const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
+    if (!userRole[0] || userRole[0].role === 'BUYER') {
+        return NextResponse.json({ message: 'Forbidden: Buyers cannot access chat' }, { status: 403 });
+    }
+
     const { searchParams } = new URL(req.url);
     const otherUserId = searchParams.get('otherUserId');
 
@@ -44,6 +51,13 @@ export async function POST(req: NextRequest) {
     if (!decodedToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     const userId = decodedToken.phone_number || decodedToken.uid;
+
+    // Check role from database
+    const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
+    if (!userRole[0] || userRole[0].role === 'BUYER') {
+        return NextResponse.json({ message: 'Forbidden: Buyers cannot send messages' }, { status: 403 });
+    }
+
     const { receiverId, encryptedContent } = await req.json();
 
     if (!receiverId || !encryptedContent) {

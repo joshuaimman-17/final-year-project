@@ -1,10 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/context/AuthContext";
-import { ToastProvider } from "@/context/ToastContext";
-import { CartProvider } from "@/context/CartContext";
-import BootstrapClient from "@/components/BootstrapClient";
+import { AuthProvider } from "@/features/auth/context/AuthContext";
+import { ToastProvider } from "@/components/common/ToastContext";
+import { CartProvider } from "@/features/marketplace/context/CartContext";
+import BootstrapClient from "@/components/common/BootstrapClient";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -58,13 +58,15 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+import SyncObserver from "@/features/auth/components/SyncObserver";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <link
           rel="stylesheet"
@@ -73,6 +75,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.variable} antialiased`}>
         <AuthProvider>
+          <SyncObserver />
           <ToastProvider>
             <CartProvider>
               <div className="bg-light min-vh-100">

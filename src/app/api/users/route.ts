@@ -10,6 +10,7 @@ export async function GET(req: NextRequest) {
         const users = await neonSql`
             SELECT id, username, full_name, avatar_url, role 
             FROM users 
+            WHERE role != 'BUYER'
             ORDER BY created_at DESC
             LIMIT 50
         `;

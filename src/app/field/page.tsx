@@ -1,250 +1,354 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { Header } from '@/components/Header';
-import { Icon } from '@/components/Icon';
-import { useAuth } from '@/context/AuthContext';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useAuth } from '@/features/auth/context/AuthContext';
 import { api } from '@/services/api';
-import { SoilData, ElevationData } from '@/types';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import { BottomNav } from '@/components/BottomNav';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
+import { BottomNav } from '@/components/common/BottomNav';
+import { Icon } from '@/components/ui/Icon';
+import dynamic from 'next/dynamic';
+
+// Field Subcomponents
+import { FieldHeader } from '@/features/field/components/FieldHeader';
+import { SensorCards } from '@/features/field/components/SensorCards';
+import { AlertsPanel } from '@/features/field/components/AlertsPanel';
+import { RecommendationEngine } from '@/features/field/components/RecommendationEngine';
+import { AIDiagnosis } from '@/features/field/components/AIDiagnosis';
+import { TimelineHistory } from '@/features/field/components/TimelineHistory';
+import { FieldSetupForm, FieldConfig } from '@/features/field/components/FieldSetupForm';
+import { FieldSummaryCard } from '@/features/field/components/FieldSummaryCard';
+
+// Lazy load the heavy chart component
+const TrendChart = dynamic(() => import('@/features/field/components/TrendChart'), {
+    ssr: false,
+    loading: () => (
+        <div className="card border-0 shadow-sm rounded-4 p-3 mb-4 bg-light d-flex align-items-center justify-content-center" style={{ height: 230 }}>
+            <div className="spinner-border text-secondary opacity-50" />
+        </div>
+    )
+});
+
+const mockChartData = [
+  { day: 'Mon', temp: 24, moisture: 45 },
+  { day: 'Tue', temp: 26, moisture: 42 },
+  { day: 'Wed', temp: 27, moisture: 40 },
+  { day: 'Thu', temp: 28, moisture: 38 },
+  { day: 'Fri', temp: 29, moisture: 35 },
+  { day: 'Sat', temp: 31, moisture: 30 },
+  { day: 'Sun', temp: 30, moisture: 55 }
+];
 
 function FieldContent() {
-    const { user, locationLoading, detectLocation } = useAuth();
-    const [soil, setSoil] = useState<SoilData | null>(null);
-    const [elevation, setElevation] = useState<ElevationData | null>(null);
+    const { user, detectLocation } = useAuth();
+    
+    // Config State
+    const [config, setConfig] = useState<FieldConfig | null>(null);
+    const [configs, setConfigs] = useState<FieldConfig[]>([]);
+    const [showSetup, setShowSetup] = useState(false);
+
+    // Data State
+    const [soil, setSoil] = useState<any>(null);
     const [weather, setWeather] = useState<any>(null);
-    const [locationName, setLocationName] = useState<string>("Locating...");
-    const [terrainType, setTerrainType] = useState<string>("Unknown");
-    const [soilTypeString, setSoilTypeString] = useState<string>("Unknown");
     const [loading, setLoading] = useState(true);
+    const [lastSynced, setLastSynced] = useState("Just now");
+    const [isOffline, setIsOffline] = useState(false);
+    const [hasError, setHasError] = useState(false);
 
-    const determineSoilType = (sand: number, silt: number, clay: number) => {
-        // Very basic soil texture triangle estimation
-        if (sand > 50 && clay < 20) return "Sandy";
-        if (clay > 40) return "Clay";
-        if (silt > 50) return "Silty";
-        if (sand >= 30 && sand <= 50 && silt >= 30 && silt <= 50 && clay >= 10 && clay <= 30) return "Loam";
-        return "Sandy Loam";
-    };
+    // Diagnosis State
+    const [diagnosis, setDiagnosis] = useState<any>(null);
+    const [scanning, setScanning] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const determineTerrain = (elev: number) => {
-        if (elev < 100) return "Flat Plains";
-        if (elev < 500) return "Rolling Hills";
-        if (elev < 1000) return "Highlands";
-        return "Mountainous";
-    };
-
+    // Initial Load
     useEffect(() => {
-        // If the user hasn't explicitly permitted location yet, `user.latitude` defaults might be 36.77
-        // Let's attempt to auto-detect location once when page mounts
-        if (!user) return;
-        detectLocation();
+        if (typeof window !== 'undefined') {
+            const savedConfig = localStorage.getItem('drplant_field_config');
+            if (savedConfig) {
+                setConfig(JSON.parse(savedConfig));
+            }
+            const savedConfigs = localStorage.getItem('drplant_field_configs_all');
+            if (savedConfigs) {
+                setConfigs(JSON.parse(savedConfigs));
+            }
+            // Load latest diagnosis
+            const cachedDiag = localStorage.getItem('drplant_latest_diagnosis');
+            if (cachedDiag) {
+                setDiagnosis(JSON.parse(cachedDiag));
+            }
+        }
     }, []);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            if (!user) return;
-            setLoading(true);
-            try {
-                // Fetch external data concurrently
-                const [soilData, elevData, weatherData, geoName] = await Promise.all([
-                    api.fetchSoil(user.latitude, user.longitude),
-                    api.fetchElevation(user.latitude, user.longitude),
-                    api.fetchWeather(user.latitude, user.longitude),
-                    api.reverseGeocode(user.latitude, user.longitude)
-                ]);
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !user) return;
 
-                setSoil(soilData);
-                setElevation(elevData);
-                setWeather(weatherData);
-                setLocationName(geoName);
+        setScanning(true);
+        const formData = new FormData();
+        formData.append('image', file);
 
-                const deducedTerrain = determineTerrain(elevData?.elevation || 0);
-                const deducedSoilType = determineSoilType(soilData.sand, soilData.silt, soilData.clay);
+        try {
+            // Import auth on demand or use from lib
+            const { auth } = await import('@/lib/firebase');
+            const token = await auth.currentUser?.getIdToken();
+            
+            const res = await fetch('/api/diagnosis/upload', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                body: formData
+            });
 
-                setTerrainType(deducedTerrain);
-                setSoilTypeString(deducedSoilType);
-
-                // Save to Firestore Database via Backend API
-                try {
-                    const { auth } = await import('@/lib/firebase');
-                    const token = await auth.currentUser?.getIdToken();
-                    
-                    if (token) {
-                        await fetch('/api/field', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Authorization': `Bearer ${token}`
-                            },
-                            body: JSON.stringify({
-                                latitude: user.latitude,
-                                longitude: user.longitude,
-                                terrainType: deducedTerrain,
-                                soilType: deducedSoilType,
-                                soilPh: soilData.ph,
-                                soilMoisture: weatherData?.current?.soil_moisture || 0,
-                                elevation: elevData?.elevation || 0
-                            })
-                        });
-                    }
-                } catch (dbError) {
-                    console.error("Failed to save field profile to database", dbError);
-                }
-
-            } catch (e) {
-                console.error("Field Data Fetch Error", e);
-            } finally {
-                setLoading(false);
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.message || 'Upload failed');
             }
-        };
 
-        // Don't fetch if location is 0,0 (invalid) 
-        if (user?.latitude && user?.longitude) {
-            fetchData();
+            const data = await res.json();
+            setDiagnosis(data.result);
+            localStorage.setItem('drplant_latest_diagnosis', JSON.stringify(data.result));
+        } catch (err: any) {
+            console.error("Scan Error", err);
+            alert(`Failed: ${err.message}`);
+        } finally {
+            setScanning(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
         }
-    }, [user?.latitude, user?.longitude]);
+    };
 
-    const MetricRow = ({ label, value, unit, icon, colorClass }: any) => (
-        <div className="d-flex align-items-center justify-content-between py-2 border-bottom last-border-0">
-            <div className="d-flex align-items-center gap-3">
-                <div className={`p-2 rounded-3 bg-opacity-10 d-flex align-items-center justify-content-center ${colorClass}`} style={{ width: '40px', height: '40px' }}>
-                    <Icon name={icon} />
-                </div>
-                <span className="small fw-semibold">{label}</span>
-            </div>
-            <span className="fw-bold">{value} <span className="small text-muted fw-normal">{unit}</span></span>
-        </div>
-    );
+    const handleSaveConfig = (newConfigs: FieldConfig[]) => {
+        if (!newConfigs || newConfigs.length === 0) return;
+        
+        // Default to showing the first profile to maintain existing chart integrations
+        const primaryConfig = newConfigs[0];
+        setConfig(primaryConfig);
+        setConfigs(newConfigs);
+        
+        // Save both primary and raw array
+        localStorage.setItem('drplant_field_config', JSON.stringify(primaryConfig));
+        localStorage.setItem('drplant_field_configs_all', JSON.stringify(newConfigs));
+        setShowSetup(false);
+    };
 
-    const AddOnFeature = ({ icon, title, description }: any) => (
-        <div className="col-6">
-            <div className="bg-white border rounded-4 p-3 h-100 d-flex flex-column align-items-start transition-all hover-scale" style={{ cursor: 'pointer' }}>
-                <div className="rounded-circle bg-light d-flex align-items-center justify-content-center mb-2" style={{ width: '36px', height: '36px' }}>
-                    <Icon name={icon} className="text-primary-green" style={{ fontSize: '18px' }} />
-                </div>
-                <h4 className="h6 fw-bold mb-1" style={{ fontSize: '13px' }}>{title}</h4>
-                <p className="small text-muted mb-0 lh-sm" style={{ fontSize: '11px' }}>{description}</p>
-                <div className="mt-auto pt-2 w-100"><span className="badge bg-light text-muted border w-100">Coming Soon</span></div>
+    // Location & Sync Intv
+    useEffect(() => {
+        if (!user) return;
+        detectLocation();
+        
+        const intv = setInterval(() => {
+            setLastSynced((prev) => {
+                if (prev === "Just now") return "1 min ago";
+                if (prev.includes("min")) {
+                    const mins = parseInt(prev) + 1;
+                    return `${mins} mins ago`;
+                }
+                return prev;
+            });
+        }, 60000);
+        return () => clearInterval(intv);
+    }, []);
+
+    const fetchFieldData = useCallback(async () => {
+        // Only fetch if config exists AND sensors are enabled
+        if (!user?.latitude || !user?.longitude || !config || config.sensorsAvailable === 'No') {
+            setLoading(false);
+            return;
+        }
+        
+        setLoading(true);
+        setHasError(false);
+
+        try {
+            const [soilData, weatherData] = await Promise.all([
+                api.fetchSoil(user.latitude, user.longitude),
+                api.fetchWeather(user.latitude, user.longitude)
+            ]);
+            
+            setSoil(soilData);
+            setWeather(weatherData);
+            setIsOffline(false);
+            setLastSynced("Just now");
+
+            try {
+                localStorage.setItem('drplant_field_cache', JSON.stringify({
+                    soil: soilData,
+                    weather: weatherData,
+                    timestamp: new Date().toISOString()
+                }));
+            } catch (storageErr) {}
+
+        } catch (e) {
+            console.error("Field Data Fetch Error", e);
+            try {
+                const cached = localStorage.getItem('drplant_field_cache');
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    setSoil(parsed.soil);
+                    setWeather(parsed.weather);
+                    setIsOffline(true);
+                    const diffMins = Math.floor((Date.now() - new Date(parsed.timestamp).getTime()) / 60000);
+                    setLastSynced(diffMins < 60 ? `${diffMins} mins ago` : `${Math.floor(diffMins/60)} hrs ago`);
+                } else {
+                    setHasError(true);
+                }
+            } catch (err) {
+                setHasError(true);
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, [user?.latitude, user?.longitude, config]);
+
+    useEffect(() => {
+        fetchFieldData();
+    }, [fetchFieldData]);
+
+    const sm = weather?.current?.soil_moisture || 45;
+    const temp = weather?.current?.temperature_2m || 28;
+    const n = soil?.nitrogen || 120;
+    const ph = soil?.ph || 6.5;
+
+    const getStatusTheme = (val: number, min: number, max: number) => {
+        if (val < min) return { color: 'danger', icon: 'error', text: 'Critical Warning' };
+        if (val > max) return { color: 'warning', icon: 'warning', text: 'Needs Attention' };
+        return { color: 'success', icon: 'check_circle', text: 'Healthy' };
+    };
+
+    const statusTheme = getStatusTheme(sm, 30, 60);
+
+    // Empty State
+    if (!config) {
+        return (
+            <div className="min-vh-100 d-flex flex-column bg-light pb-5">
+                <header className="bg-primary-green text-white px-3 py-4 shadow-sm position-relative sticky-top" style={{ zIndex: 10 }}>
+                    <div className="mx-auto w-100" style={{ maxWidth: '448px' }}>
+                        <h1 className="h5 fw-bold mb-0">Dr.Plant Field Operations</h1>
+                        <p className="small text-white-50 mb-0">Smart Agriculture Dashboard</p>
+                    </div>
+                </header>
+                <main className="flex-grow-1 d-flex flex-column align-items-center justify-content-center px-4 text-center mx-auto" style={{ maxWidth: '448px' }}>
+                    <div className="rounded-circle bg-primary-green bg-opacity-10 text-primary-green p-4 mb-4">
+                        <Icon name="landscape" style={{ fontSize: 64 }} />
+                    </div>
+                    <h2 className="h4 fw-bold text-dark mb-2">Welcome to Your Field</h2>
+                    <p className="text-muted small mb-4">No data available. Add your field details to get personalized smart recommendations, track crop lifecycles, and monitor live sensors.</p>
+                    <button onClick={() => setShowSetup(true)} className="btn btn-primary-green btn-lg rounded-pill px-5 py-3 fw-bold shadow-sm d-flex align-items-center gap-2">
+                        <Icon name="add_circle" /> Setup Field Now
+                    </button>
+                </main>
+                <BottomNav />
+                {showSetup && <FieldSetupForm initialConfigs={configs} onSave={handleSaveConfig} onCancel={() => setShowSetup(false)} />}
             </div>
-        </div>
-    );
+        );
+    }
+
+    // Error State
+    if (hasError && !loading && config.sensorsAvailable === 'Yes') {
+        return (
+            <div className="min-vh-100 d-flex flex-column align-items-center justify-content-center bg-light px-4 text-center">
+                <div className="rounded-circle bg-danger bg-opacity-10 text-danger p-4 mb-3">
+                    <Icon name="wifi_off" style={{ fontSize: 48 }} />
+                </div>
+                <h2 className="h5 fw-bold text-dark">Connection Lost</h2>
+                <p className="text-muted small">Unable to fetch live field data and no offline cache was found.</p>
+                <button onClick={fetchFieldData} className="btn btn-primary-green rounded-pill px-4 py-2 mt-2 fw-bold d-flex align-items-center gap-2">
+                    <Icon name="refresh" /> Retry Connection
+                </button>
+                <BottomNav />
+            </div>
+        );
+    }
 
     return (
-        <div className="min-vh-100 d-flex flex-column pb-5 bg-light">
-            <Header title="Field Analysis" showBack={false} />
+        <div className="min-vh-100 d-flex flex-column pb-5 bg-light" style={{ fontFamily: 'Inter, sans-serif' }}>
+            
+            <FieldHeader 
+                farmName={config.fieldName || user?.farm_name || 'My Farm'}
+                loading={loading}
+                lastSynced={config.sensorsAvailable === 'No' ? 'N/A' : lastSynced}
+                statusIcon={config.sensorsAvailable === 'No' ? 'info' : statusTheme.icon}
+                statusText={config.sensorsAvailable === 'No' ? 'Predictive Mode' : statusTheme.text}
+                statusBg={config.sensorsAvailable === 'No' ? 'bg-secondary' : `bg-${statusTheme.color}`}
+                isOffline={isOffline}
+            />
 
-            <main className="flex-grow-1 p-3 mx-auto w-100 animate-fade-in" style={{ maxWidth: '448px' }}>
+            <main className="flex-grow-1 p-3 mx-auto w-100 pb-5 mb-4 animate-fade-in" style={{ maxWidth: '448px' }}>
                 
-                {/* 1. Field Overview */}
-                <section className="card rounded-4 p-4 shadow-sm border-0 mb-4 bg-primary-green text-white position-relative overflow-hidden">
-                    <div className="position-absolute top-0 end-0 opacity-10 mt-n4 me-n4">
-                        <Icon name="map" style={{ fontSize: '150px' }} />
+                <FieldSummaryCard config={config} onEdit={() => setShowSetup(true)} />
+
+                {config.sensorsAvailable === 'Yes' ? (
+                    <>
+                        <AlertsPanel sm={sm} loading={loading} />
+                        <SensorCards loading={loading} sm={sm} temp={temp} n={n} ph={ph} smColor={statusTheme.color} />
+                    </>
+                ) : (
+                    <div className="card border border-secondary border-opacity-25 shadow-sm rounded-4 p-4 text-center mb-4 bg-white bg-opacity-75">
+                        <Icon name="sensors_off" className="text-muted mb-2 opacity-50 display-4" />
+                        <h4 className="h6 fw-bold text-dark mb-1">No Sensors Connected</h4>
+                        <p className="small text-muted mb-0">Hardware telemetry is disabled in your Profile Budget settings. Switch to 'Yes' to enable live moisture readouts.</p>
                     </div>
-                    <div className="position-relative z-1">
-                        <div className="d-flex justify-content-between align-items-start mb-3">
-                            <div>
-                                <h2 className="h4 fw-bold mb-1">{user?.farm_name || "My Farm"}</h2>
-                                <p className="mb-0 text-white-50 d-flex align-items-center gap-1 small">
-                                    <Icon name="location_on" style={{ fontSize: '14px' }} />
-                                    {loading ? "Locating..." : locationName}
-                                </p>
-                            </div>
-                            {locationLoading ? (
-                                <span className="badge bg-white text-primary-green bg-opacity-25" style={{ fontSize: '10px' }}>Syncing GPS...</span>
-                            ) : (
-                                <button onClick={() => detectLocation()} className="btn btn-sm btn-light rounded-circle p-2 shadow-sm">
-                                    <Icon name="my_location" className="text-primary-green" style={{ fontSize: '16px' }} />
-                                </button>
-                            )}
-                        </div>
-                        <div className="bg-white bg-opacity-10 rounded-3 p-3 mt-3 font-monospace small">
-                            {user?.latitude.toFixed(5)}, {user?.longitude.toFixed(5)}
-                        </div>
-                    </div>
-                </section>
+                )}
 
-                {/* 2. Terrain Details */}
-                <section className="card rounded-4 p-4 shadow-sm border-0 mb-4">
-                    <h3 className="h6 fw-bold mb-3 d-flex align-items-center gap-2 text-dark">
-                        <Icon name="landscape" className="text-secondary" />
-                        Terrain Details
-                    </h3>
-                    <div className="row g-3">
-                        <div className="col-6">
-                            <div className="bg-light p-3 rounded-3 h-100">
-                                <p className="small text-muted mb-1 d-flex align-items-center gap-1"><Icon name="filter_hdr" style={{ fontSize: '14px' }}/> Elevation</p>
-                                <p className="h5 fw-bold mb-0">
-                                    {loading ? '...' : elevation?.elevation?.toFixed(1) || 'N/A'}
-                                    <span className="small fw-normal text-muted ms-1">m</span>
-                                </p>
-                            </div>
-                        </div>
-                        <div className="col-6">
-                            <div className="bg-light p-3 rounded-3 h-100">
-                                <p className="small text-muted mb-1 d-flex align-items-center gap-1"><Icon name="terrain" style={{ fontSize: '14px' }}/> Topology</p>
-                                <p className="h6 fw-bold mb-0 text-truncate" title={terrainType}>
-                                    {loading ? '...' : terrainType}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </section>
+                <RecommendationEngine config={config} sm={config.sensorsAvailable === 'Yes' ? sm : 45} />
 
-                {/* 3. Soil Analysis */}
-                <section className="card rounded-4 p-4 shadow-sm border-0 mb-4 position-relative">
-                    <div className="d-flex align-items-center justify-content-between mb-4">
-                        <div>
-                            <h3 className="h6 fw-bold d-flex align-items-center gap-2 mb-1 text-dark">
-                                <Icon name="grass" className="text-success" />
-                                Soil Analysis
-                            </h3>
-                            <p className="small text-muted mb-0">Estimated Type: <span className="fw-bold text-dark">{loading ? '...' : soilTypeString}</span></p>
-                        </div>
-                    </div>
+                {config.sensorsAvailable === 'Yes' && (
+                    <TrendChart data={mockChartData} />
+                )}
 
-                    {loading ? (
-                        <div className="py-4 text-center"><div className="spinner-border text-success" role="status"></div></div>
-                    ) : soil ? (
-                        <div className="d-grid gap-1">
-                            <MetricRow label="Soil pH" value={soil.ph.toFixed(1)} unit="pH" icon="science" colorClass="text-purple bg-purple-subtle" />
-                            <MetricRow label="Moisture (0-1cm)" value={weather?.current?.soil_moisture || 0} unit="m³/m³" icon="water_drop" colorClass="text-primary bg-primary-subtle" />
-                            <MetricRow label="Organic Carbon" value={soil.organic_carbon.toFixed(1)} unit="g/kg" icon="carbon_source" colorClass="text-secondary bg-gray-subtle" />
-                            <MetricRow label="Nitrogen" value={soil.nitrogen.toFixed(2)} unit="g/kg" icon="eco" colorClass="text-success bg-success-subtle" />
+                <AIDiagnosis data={diagnosis} loading={scanning} />
 
-                            <div className="mt-4 pt-4 border-top">
-                                <p className="small fw-bold text-muted text-uppercase mb-3">Soil Texture Breakdown</p>
-                                <div className="progress overflow-visible" style={{ height: '8px' }}>
-                                    <div className="progress-bar bg-warning rounded-start" style={{ width: `${soil.sand / 10}%` }} title="Sand"></div>
-                                    <div className="progress-bar bg-info" style={{ width: `${soil.silt / 10}%` }} title="Silt"></div>
-                                    <div className="progress-bar bg-danger rounded-end" style={{ width: `${soil.clay / 10}%` }} title="Clay"></div>
-                                </div>
-                                <div className="d-flex justify-content-between mt-2 small font-monospace" style={{ fontSize: '11px' }}>
-                                    <div className="d-flex align-items-center gap-1 fw-bold text-warning"><span className="d-inline-block rounded-circle bg-warning" style={{ width: '8px', height: '8px' }}></span> SAND {(soil.sand / 10).toFixed(0)}%</div>
-                                    <div className="d-flex align-items-center gap-1 fw-bold text-info"><span className="d-inline-block rounded-circle bg-info" style={{ width: '8px', height: '8px' }}></span> SILT {(soil.silt / 10).toFixed(0)}%</div>
-                                    <div className="d-flex align-items-center gap-1 fw-bold text-danger"><span className="d-inline-block rounded-circle bg-danger" style={{ width: '8px', height: '8px' }}></span> CLAY {(soil.clay / 10).toFixed(0)}%</div>
-                                </div>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="text-center py-4 text-muted small">
-                            <Icon name="portable_wifi_off" className="display-4 text-muted opacity-25 mb-2 d-block" />
-                            Unable to fetch soil data for this location.
-                        </div>
-                    )}
-                </section>
+                <TimelineHistory config={config} />
 
-                {/* 4. Modular Features */}
-                <h3 className="h6 fw-bold mb-3 text-dark px-1">Management Features</h3>
-                <div className="row g-3">
-                    <AddOnFeature icon="agriculture" title="Crop Tracking" description="Monitor growth stages & yield" />
-                    <AddOnFeature icon="water" title="Irrigation" description="Smart watering schedules" />
-                    <AddOnFeature icon="vaccines" title="Fertilizer" description="Nutrient recommendations" />
-                    <AddOnFeature icon="event_note" title="Field Notes" description="Log daily activities & issues" />
-                </div>
             </main>
+
+            {/* Hidden File Input */}
+            <input 
+                type="file" 
+                ref={fileInputRef} 
+                onChange={handleFileChange} 
+                accept="image/*" 
+                className="d-none" 
+            />
+
+            {/* Floating Action Button (FAB) relative to BottomNav */}
+            <div className="position-fixed d-flex justify-content-end p-3 pointer-events-none" style={{ bottom: '70px', right: '0', left: '0', maxWidth: '448px', margin: '0 auto', zIndex: 100 }}>
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={scanning}
+                    className="btn btn-primary-green rounded-pill shadow-lg d-flex align-items-center gap-2 px-4 py-3 fw-bold pointer-events-auto hover-scale border border-2 border-white"
+                >
+                    {scanning ? (
+                        <div className="spinner-border spinner-border-sm" />
+                    ) : (
+                        <Icon name="document_scanner" />
+                    )}
+                    {scanning ? 'Scanning...' : 'Scan Plant'}
+                </button>
+            </div>
+
             <BottomNav />
+            
+            {showSetup && (
+                <FieldSetupForm 
+                    initialConfigs={configs} 
+                    onSave={handleSaveConfig} 
+                    onCancel={() => setShowSetup(false)} 
+                />
+            )}
+
+            <style>{`
+            .pointer-events-none { pointer-events: none; }
+            .pointer-events-auto { pointer-events: auto; }
+            .hover-scale { transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+            .hover-scale:hover { transform: scale(1.05); }
+            .z-max { z-index: 1050; }
+            .skeleton-pulse {
+                animation: pulse 1.5s infinite ease-in-out;
+            }
+            @keyframes pulse {
+                0% { opacity: 0.6; }
+                50% { opacity: 0.3; }
+                100% { opacity: 0.6; }
+            }
+            `}</style>
         </div>
     );
 }

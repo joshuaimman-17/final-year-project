@@ -17,8 +17,8 @@ export async function GET(req: NextRequest) {
         const users = await neonSql`
             SELECT id, username, full_name, avatar_url, role 
             FROM users 
-            WHERE username ILIKE ${'%' + query + '%'}
-            OR full_name ILIKE ${'%' + query + '%'}
+            WHERE (username ILIKE ${'%' + query + '%'} OR full_name ILIKE ${'%' + query + '%'})
+            AND role != 'BUYER'
             LIMIT 10
         `;
 

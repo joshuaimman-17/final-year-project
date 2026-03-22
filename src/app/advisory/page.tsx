@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Header } from '@/components/Header';
-import { Icon } from '@/components/Icon';
-import { useAuth } from '@/context/AuthContext';
+import { Header } from '@/components/common/Header';
+import { Icon } from '@/components/ui/Icon';
+import { useAuth } from '@/features/auth/context/AuthContext';
 import { api } from '@/services/api';
 import { ClimateData, WeatherData } from '@/types';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import { BottomNav } from '@/components/BottomNav';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
+import { BottomNav } from '@/components/common/BottomNav';
 
 function AdvisoryContent() {
     const { user } = useAuth();

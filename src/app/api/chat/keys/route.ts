@@ -53,6 +53,13 @@ export async function POST(req: NextRequest) {
     if (!decodedToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     const userId = decodedToken.phone_number || decodedToken.uid;
+
+    // Check role from database
+    const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
+    if (!userRole[0] || userRole[0].role === 'BUYER') {
+        return NextResponse.json({ message: 'Forbidden: Buyers cannot manage chat keys' }, { status: 403 });
+    }
+
     const { publicKey, encryptedPrivateKey } = await req.json();
 
     if (!publicKey) {

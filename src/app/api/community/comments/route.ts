@@ -48,6 +48,16 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+    const decodedToken = await verifyAuth(req);
+    if (!decodedToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+
+    // Check role from database
+    const { default: neonSql } = await import('@/lib/neon');
+    const userRole = await neonSql`SELECT role FROM users WHERE id = ${decodedToken.phone_number || decodedToken.uid}`;
+    if (!userRole[0] || userRole[0].role === 'BUYER') {
+        return NextResponse.json({ message: 'Forbidden: Buyers cannot comment on posts' }, { status: 403 });
+    }
+
     try {
         const body = await req.json();
         const { postId, parentId, authorId, authorName, authorAvatar, text } = body;

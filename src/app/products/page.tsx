@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useCart } from '@/context/CartContext';
+import { useCart } from '@/features/marketplace/context/CartContext';
 import { api } from '@/services/api';
 import { Product } from '@/types';
-import { Icon } from '@/components/Icon';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import { BottomNav } from '@/components/BottomNav';
+import { Icon } from '@/components/ui/Icon';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
+import { BottomNav } from '@/components/common/BottomNav';
 import Link from 'next/link';
 
 function ProductsContent() {

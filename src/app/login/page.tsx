@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
-import { Icon } from '@/components/Icon';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { Icon } from '@/components/ui/Icon';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -13,17 +13,25 @@ export default function LoginPage() {
     const [rememberMe, setRememberMe] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    // Track if redirect has already been triggered to avoid double-fires
+    const redirected = useRef(false);
 
-    const { user, login, loginWithGoogle } = useAuth();
+    const { user, login, loginWithGoogle, loading: authLoading } = useAuth();
     const router = useRouter();
+    const isProcessing = loading || authLoading;
 
-    // ── Redirect once user is resolved ──
+    // ── Redirect once BACKEND sync is done and user is fully resolved ──
+    // Wait until authLoading is false so we use the final backend role,
+    // not the stale localStorage value.
     useEffect(() => {
-        if (!user) return;
-        
+        if (authLoading) return;       // still syncing, wait
+        if (!user) return;             // not logged in
+        if (redirected.current) return; // already redirected, skip
+
+        redirected.current = true;
         const role = user.role?.toUpperCase();
         console.log(`[Login] Redirecting user with role: ${role}`);
-        
+
         switch (role) {
             case 'ADMIN':
                 router.replace('/admin/dashboard');
@@ -40,18 +48,19 @@ export default function LoginPage() {
             default:
                 router.replace('/');
         }
-    }, [user, router]);
+    }, [user, authLoading, router]);
 
     const handleEmailLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError('');
+        redirected.current = false; // reset for fresh login
         try {
             await login(email, password);
+            // Redirect is handled by useEffect above once sync completes
         } catch (err: any) {
             console.error("[Login] Failed:", err);
-            window.alert("LOGIN ERROR: " + (err.message || 'Unknown error'));
-            setError(err.message || 'Login failed');
+            setError(err.message || 'Login failed. Please check your credentials.');
         } finally {
             setLoading(false);
         }
@@ -60,14 +69,28 @@ export default function LoginPage() {
     const handleGoogleLogin = async () => {
         setLoading(true);
         setError('');
+        redirected.current = false;
         try {
             await loginWithGoogle();
         } catch (err: any) {
-            setError(err.message || 'Google sign-in failed');
+            setError(err.message || 'Google sign-in failed. Please try again.');
         } finally {
             setLoading(false);
         }
     };
+
+    // Show full-page spinner while checking auth state on initial load
+    if (authLoading && !user) {
+        return (
+            <div className="min-vh-100 d-flex align-items-center justify-content-center"
+                 style={{ background: 'linear-gradient(135deg, #f1f8e9 0%, #c5e1a5 100%)' }}>
+                <div className="text-center">
+                    <div className="spinner-border text-success mb-3" role="status" style={{ width: '3rem', height: '3rem' }}></div>
+                    <p className="text-muted small">Checking session...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-vh-100 d-flex align-items-center justify-content-center p-3" 
@@ -102,6 +125,8 @@ export default function LoginPage() {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     required
+                                    disabled={isProcessing}
+                                    autoComplete="email"
                                 />
                             </div>
                         </div>
@@ -122,11 +147,15 @@ export default function LoginPage() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
+                                    disabled={isProcessing}
+                                    autoComplete="current-password"
                                 />
                                 <button
                                     type="button"
                                     className="btn btn-light border-0 text-muted px-3"
                                     onClick={() => setShowPassword(!showPassword)}
+                                    tabIndex={-1}
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
                                 >
                                     <Icon name={showPassword ? "visibility" : "visibility_off"} style={{ fontSize: '18px' }} />
                                 </button>
@@ -150,11 +179,11 @@ export default function LoginPage() {
 
                         <button 
                             type="submit" 
-                            disabled={loading} 
+                            disabled={isProcessing} 
                             className="btn btn-primary-green btn-lg w-100 rounded-3 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2"
                             style={{ height: '52px' }}
                         >
-                            {loading ? (
+                            {isProcessing ? (
                                 <span className="spinner-border spinner-border-sm" role="status"></span>
                             ) : (
                                 <>Sign In <Icon name="login" /></>
@@ -169,31 +198,22 @@ export default function LoginPage() {
 
                     <button 
                         onClick={handleGoogleLogin} 
-                        disabled={loading} 
+                        disabled={isProcessing}  // fixed: was `loading` only, now covers authLoading too
                         className="btn btn-light border w-100 rounded-3 d-flex align-items-center justify-content-center gap-2 fw-bold mb-3" 
                         style={{ height: '52px' }}
                     >
-                        <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="20" height="20" />
-                        Google
+                        {isProcessing && !loading ? (
+                            <span className="spinner-border spinner-border-sm text-secondary" role="status"></span>
+                        ) : (
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" width="20" height="20" />
+                        )}
+                        Continue with Google
                     </button>
 
                     <div className="text-center mt-4">
                         <p className="text-muted small mb-0">
-                            Dr. Plant member? <Link href="/signup" className="text-primary-green text-decoration-none fw-bold">Create Account</Link>
+                            New to Dr.Plant? <Link href="/signup" className="text-primary-green text-decoration-none fw-bold">Create Account</Link>
                         </p>
-                        <hr className="my-3 opacity-10" />
-                        <button 
-                            type="button"
-                            onClick={() => {
-                                setEmail('ksdharanidharan2005@gmail.com');
-                                setPassword('Admin@123');
-                                window.alert("Credentials pre-filled. Please click 'Sign In' to test.");
-                            }}
-                            className="btn btn-link btn-sm text-muted text-decoration-none"
-                            style={{ fontSize: '10px' }}
-                        >
-                            [Admin Debug: Pre-fill Credentials]
-                        </button>
                     </div>
                 </div>
             </div>

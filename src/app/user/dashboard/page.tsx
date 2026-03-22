@@ -1,10 +1,10 @@
 "use client";
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { BottomNav } from '@/components/BottomNav';
+import { BottomNav } from '@/components/common/BottomNav';
 import { auth } from '@/lib/firebase';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
 import Link from 'next/link';
 
 function UserDashboard() {

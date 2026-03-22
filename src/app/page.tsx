@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Icon } from '@/components/Icon';
-import { useAuth } from '@/context/AuthContext';
-import { useWeatherData } from '@/hooks/useWeatherData';
+import { Icon } from '@/components/ui/Icon';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { useWeatherData } from '@/features/field/hooks/useWeatherData';
 import { AreaChart, Area, XAxis, Tooltip, ResponsiveContainer, YAxis } from 'recharts';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import { BottomNav } from '@/components/BottomNav';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
+import { BottomNav } from '@/components/common/BottomNav';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
@@ -16,7 +16,7 @@ const DEFAULT_LON = 78.9629; // India center — more appropriate default
 
 
 // Dynamically import Leaflet Map to prevent "window is not defined" SSR errors
-const FarmMap = dynamic(() => import('@/components/MapComponent'), {
+const FarmMap = dynamic(() => import('@/features/field/components/MapComponent'), {
   ssr: false,
   loading: () => (
     <div className="w-100 h-100 d-flex flex-column align-items-center justify-content-center text-muted gap-2 bg-light">
@@ -141,8 +141,8 @@ function DashboardContent() {
   const { coords, geoLoading, geoError, showPromptBanner, requestPermission, dismissPrompt, recenter } = useGeolocation();
 
   // Resolved lat/lon: prefer real GPS, fallback to profile coords, then default
-  const lat = coords?.lat ?? user?.latitude ?? DEFAULT_LAT;
-  const lon = coords?.lon ?? user?.longitude ?? DEFAULT_LON;
+  const lat = Number(coords?.lat ?? user?.latitude ?? DEFAULT_LAT);
+  const lon = Number(coords?.lon ?? user?.longitude ?? DEFAULT_LON);
 
   const { data, loading, error } = useWeatherData(lat, lon);
 

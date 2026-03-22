@@ -1,10 +1,10 @@
 "use client";
 import React from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth/context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { BottomNav } from '@/components/BottomNav';
+import { BottomNav } from '@/components/common/BottomNav';
 import Link from 'next/link';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
 
 export default function ExpertDashboard() {
     const { user, logout } = useAuth();

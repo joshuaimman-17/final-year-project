@@ -100,3 +100,15 @@ CREATE INDEX IF NOT EXISTS idx_likes_comment ON comment_likes(comment_id);
 CREATE INDEX IF NOT EXISTS idx_fcm_user ON fcm_tokens(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sender ON chat_messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_chat_receiver ON chat_messages(receiver_id);
+
+-- 8. Follows Table
+CREATE TABLE IF NOT EXISTS follows (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    follower_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    followee_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(follower_id, followee_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_follows_follower ON follows(follower_id);
+CREATE INDEX IF NOT EXISTS idx_follows_followee ON follows(followee_id);

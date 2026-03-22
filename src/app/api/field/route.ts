@@ -12,6 +12,13 @@ export async function GET(req: NextRequest) {
         }
         const userId = decodedToken.phone_number || decodedToken.uid;
 
+        // Check role from database
+        const neonSql = (await import('@/lib/neon')).default;
+        const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
+        if (!userRole[0] || userRole[0].role === 'BUYER') {
+            return NextResponse.json({ message: 'Forbidden: Buyers cannot access field data' }, { status: 403 });
+        }
+
         const db = admin.firestore();
         const fieldSnap = await db.collection('user_fields').where('userId', '==', userId).limit(1).get();
 
@@ -40,6 +47,13 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
         const userId = decodedToken.phone_number || decodedToken.uid;
+
+        // Check role from database
+        const neonSql = (await import('@/lib/neon')).default;
+        const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
+        if (!userRole[0] || userRole[0].role === 'BUYER') {
+            return NextResponse.json({ message: 'Forbidden: Buyers cannot manage fields' }, { status: 403 });
+        }
 
         const body = await req.json();
         const { latitude, longitude, terrainType, soilType, soilPh, soilMoisture, elevation } = body;

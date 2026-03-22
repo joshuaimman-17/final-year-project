@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Header } from '@/components/Header';
-import { BottomNav } from '@/components/BottomNav';
-import { PostCard } from '@/components/PostCard';
-import { CreatePostModal } from '@/components/CreatePostModal';
-import { Icon } from '@/components/Icon';
-import { useAuth } from '@/context/AuthContext';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import { Header } from '@/components/common/Header';
+import { BottomNav } from '@/components/common/BottomNav';
+import { PostCard } from '@/features/community/components/PostCard';
+import { CreatePostModal } from '@/features/community/components/CreatePostModal';
+import { Icon } from '@/components/ui/Icon';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
 import { auth } from '@/lib/firebase';
 
 function CommunityContent() {
@@ -15,11 +15,12 @@ function CommunityContent() {
     const [posts, setPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [filter, setFilter] = useState<'all' | 'following'>('all');
 
     const fetchPosts = async () => {
         try {
             const token = await auth.currentUser?.getIdToken();
-            const res = await fetch('/api/community/posts', {
+            const res = await fetch(`/api/community/posts${filter === 'following' ? '?filter=following' : ''}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const data = await res.json();
@@ -40,7 +41,7 @@ function CommunityContent() {
         }, 2000);
 
         return () => clearInterval(pollInterval);
-    }, []);
+    }, [filter]);
 
     const handlePostCreated = (newPost: any) => {
         setPosts(prev => [newPost, ...prev]);
@@ -72,8 +73,21 @@ function CommunityContent() {
                 </div>
 
                 <div className="d-flex align-items-center justify-content-between mb-3 px-1">
-                    <h2 className="h6 fw-bold mb-0">Recent Updates</h2>
-                    <Icon name="tune" className="text-muted small" />
+                    <div className="d-flex gap-2 bg-white rounded-pill p-1 shadow-sm border">
+                        <button 
+                            onClick={() => setFilter('all')} 
+                            className={`btn btn-sm rounded-pill px-3 fw-bold ${filter === 'all' ? 'btn-success' : 'btn-light border-0 text-muted'}`}
+                        >
+                            Explore
+                        </button>
+                        <button 
+                            onClick={() => setFilter('following')} 
+                            className={`btn btn-sm rounded-pill px-3 fw-bold ${filter === 'following' ? 'btn-success' : 'btn-light border-0 text-muted'}`}
+                        >
+                            Following
+                        </button>
+                    </div>
+                    <Icon name="tune" className="text-muted small pe-auto" style={{ cursor: 'pointer' }}/>
                 </div>
 
                 {/* Feed */}

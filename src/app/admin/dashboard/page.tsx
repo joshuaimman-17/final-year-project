@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState, useCallback } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth } from '@/features/auth/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { auth } from '@/lib/firebase';
 
@@ -65,7 +65,10 @@ export default function AdminDashboard() {
         setLoading(true);
         try {
             const token = await getToken();
-            const res = await fetch('/api/admin/users', { headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`/api/admin/users?t=${Date.now()}`, { 
+                headers: { Authorization: `Bearer ${token}` },
+                cache: 'no-store'
+            });
             if (!res.ok) throw new Error('Failed to fetch users');
             const data = await res.json();
             setUsers(data.users || []);
@@ -113,6 +116,12 @@ export default function AdminDashboard() {
     }, [tab, fetchUsers, fetchExpertRequests, fetchAdminPosts]);
 
     const handleRoleChange = async (userId: string, newRole: string) => {
+        // Optimistic update
+        const previousUsers = [...users];
+        setUsers(currentUsers => currentUsers.map(u => 
+            u.id === userId ? { ...u, role: newRole } : u
+        ));
+
         try {
             const token = await getToken();
             const res = await fetch('/api/admin/users', {
@@ -120,11 +129,18 @@ export default function AdminDashboard() {
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ userId, role: newRole })
             });
-            if (!res.ok) throw new Error('Failed to update role');
+            if (!res.ok) {
+                const errorData = await res.json();
+                throw new Error(errorData.message || 'Failed to update role');
+            }
             setMsg(`Role updated to ${newRole}`);
-            fetchUsers();
+            // Wait 1s for consistency proxy before refreshing
+            setTimeout(() => fetchUsers(), 1000);
         } catch (err: any) {
             setMsg(`Error: ${err.message}`);
+            // Rollback on error
+            setUsers(previousUsers);
+            window.alert("UPDATE FAILED: " + err.message);
         }
     };
 
@@ -361,8 +377,8 @@ export default function AdminDashboard() {
                                                     </div>
                                                 </td>
                                                 <td>
-                                                    <span className={`badge rounded-pill fw-bold ${badgeColor[u.role] || 'bg-light text-dark'}`} style={{ fontSize: '10px' }}>
-                                                        {u.role}
+                                                    <span className={`badge rounded-pill fw-bold ${badgeColor[u.role.toUpperCase()] || 'bg-light text-dark'}`} style={{ fontSize: '10px' }}>
+                                                        {u.role.toUpperCase()}
                                                     </span>
                                                 </td>
                                                 <td>
@@ -377,8 +393,8 @@ export default function AdminDashboard() {
                                                             <select 
                                                                 className="form-select form-select-sm border-0 bg-light shadow-none fw-bold" 
                                                                 style={{ width: '130px', fontSize: '12px' }}
-                                                                defaultValue={u.role}
-                                                                onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                                                                value={u.role.toUpperCase()}
+                                                                onChange={(e) => handleRoleChange(u.id, e.target.value.toUpperCase())}
                                                             >
                                                                 <option value="BUYER">Buyer</option>
                                                                 <option value="FARMER">Farmer</option>

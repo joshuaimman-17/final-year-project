@@ -1,12 +1,12 @@
 "use client";
 
 import React from 'react';
-import { useCart } from '@/context/CartContext';
-import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
-import { Icon } from '@/components/Icon';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import { BottomNav } from '@/components/BottomNav';
+import { useCart } from '@/features/marketplace/context/CartContext';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { useToast } from '@/components/common/ToastContext';
+import { Icon } from '@/components/ui/Icon';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
+import { BottomNav } from '@/components/common/BottomNav';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -87,7 +87,7 @@ function CartContent() {
                 ) : (
                     <>
                         <div className="d-grid gap-3 mb-4">
-                            {cart.map(item => (
+                            {cart.map((item: any) => (
                                 <div key={item.id || item._id} className="card border-0 shadow-sm rounded-4 overflow-hidden">
                                     <div className="d-flex p-3">
                                         <img src={item.image_url} alt={item.name} className="rounded-3 object-fit-cover" style={{ width: '70px', height: '70px' }} />

@@ -12,6 +12,15 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  async redirects() {
+    return [
+      {
+        source: '/field-setup',
+        destination: '/field',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default withPWA(nextConfig);

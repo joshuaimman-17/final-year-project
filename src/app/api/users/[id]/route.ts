@@ -2,33 +2,87 @@ import { NextRequest, NextResponse } from 'next/server';
 import neonSql from '@/lib/neon';
 import { verifyAuth } from '@/lib/authHelper';
 
+/**
+ * GET: Fetch public profile of a user (Experts or Farmers)
+ * Production-ready handler with robust error tracking and type safety.
+ */
 export async function GET(
     req: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
+    { params }: { params: any }
 ) {
-    const decodedToken = await verifyAuth(req);
-    if (!decodedToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-    const resolvedParams = await params;
-    const { id } = resolvedParams;
+    const requestId = `prof_${Date.now().toString(36)}`;
+    console.log(`[API][${requestId}] GET Profile request started`);
 
     try {
-        // Fetch user basic info and follower count
+        // Resolve params for Next.js 14 vs 15 compatibility
+        const resolvedParams = (params && typeof params.then === 'function') 
+            ? await params 
+            : params;
+        
+        const rawId = resolvedParams?.id;
+        
+        if (!rawId) {
+            console.error(`[API][${requestId}] Missing ID in dynamic route parameters`);
+            return NextResponse.json({ 
+                message: 'User ID is required', 
+                debug: 'Missing ID in params' 
+            }, { status: 400 });
+        }
+
+        const id = String(rawId);
+        console.log(`[API][${requestId}] Fetching profile for UID: "${id}"`);
+
+        // Optional Auth check
+        try {
+            await verifyAuth(req);
+        } catch (e) {
+            console.warn(`[API][${requestId}] Auth verification issue (ignored):`, e);
+        }
+
+        // Primary User Fetch
+        // We use ::text to ensure PostgreSQL treats the Firebase UID correctly as a string.
         const userResult = await neonSql`
-            SELECT 
-                u.id, u.username, u.full_name, u.role, u.created_at, u.about, u.avatar_url,
-                (SELECT COUNT(*) FROM followers WHERE following_id = u.id) as follower_count
-            FROM users u
-            WHERE u.id = ${id}
+            SELECT id, username, full_name, role, created_at, location, latitude, longitude, avatar_url, farm_name
+            FROM users 
+            WHERE id = ${id}::text
+            LIMIT 1
         `;
 
-        if (userResult.length === 0) {
+        if (!userResult || userResult.length === 0) {
+            console.log(`[API][${requestId}] Profile not found for UID: "${id}"`);
             return NextResponse.json({ message: 'User not found' }, { status: 404 });
         }
 
-        return NextResponse.json(userResult[0]);
-    } catch (error: any) {
-        console.error('Fetch User Profile Error:', error);
-        return NextResponse.json({ message: error.message }, { status: 500 });
+        const user = userResult[0];
+
+        // Resilient Follow Counts
+        let follower_count = 0;
+        let following_count = 0;
+
+        try {
+            // BigInt casting logic (Number() ensures JSON safety)
+            const followerRes = await neonSql`SELECT COUNT(*) as count FROM follows WHERE followee_id = ${id}::text`;
+            follower_count = Number(followerRes[0]?.count || 0);
+
+            const followingRes = await neonSql`SELECT COUNT(*) as count FROM follows WHERE follower_id = ${id}::text`;
+            following_count = Number(followingRes[0]?.count || 0);
+        } catch (dbErr: any) {
+            console.warn(`[API][${requestId}] Follow counts fetch issue (expected if table missing):`, dbErr.message);
+        }
+
+        console.log(`[API][${requestId}] Profile success: "${id}"`);
+        return NextResponse.json({
+            ...user,
+            follower_count,
+            following_count
+        });
+
+    } catch (criticalError: any) {
+        console.error(`[API][${requestId}] Internal Server Error:`, criticalError);
+        return NextResponse.json({ 
+            message: 'Server error while loading profile',
+            error: criticalError.message || 'Unknown database or serialization error',
+            requestId: requestId
+        }, { status: 500 });
     }
 }

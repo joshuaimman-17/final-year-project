@@ -8,6 +8,15 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
+    const userId = decodedToken.phone_number || decodedToken.uid;
+    
+    // Check role from database
+    const { default: neonSql } = await import('@/lib/neon');
+    const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
+    if (!userRole[0] || userRole[0].role?.toUpperCase() === 'BUYER') {
+        return NextResponse.json({ message: 'Forbidden: Buyers cannot perform diagnosis' }, { status: 403 });
+    }
+
     try {
         const formData = await req.formData();
         const file = formData.get('image') as File;

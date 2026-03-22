@@ -1,12 +1,12 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { Header } from '@/components/Header';
-import { Icon } from '@/components/Icon';
-import { useAuth } from '@/context/AuthContext';
+import { Header } from '@/components/common/Header';
+import { Icon } from '@/components/ui/Icon';
+import { useAuth } from '@/features/auth/context/AuthContext';
 import { auth } from '@/lib/firebase';
 import { useParams, useRouter } from 'next/navigation';
-import { BottomNav } from '@/components/BottomNav';
+import { BottomNav } from '@/components/common/BottomNav';
 
 export default function PublicProfilePage() {
     const { user } = useAuth();
@@ -22,31 +22,44 @@ export default function PublicProfilePage() {
 
     useEffect(() => {
         const fetchProfile = async () => {
-            try {
-                const token = auth.currentUser ? await auth.currentUser.getIdToken() : '';
-                const headers: any = {};
-                if (token) headers['Authorization'] = `Bearer ${token}`;
+            const requestId = `req_${Date.now().toString(36)}`;
+            console.log(`[Profile][${requestId}] Fetching profile for UID: "${targetUserId}"`);
 
-                const res = await fetch(`/api/users/${targetUserId}`, { headers });
-                
+            if (!targetUserId) {
+                setError('Invalid user ID in URL');
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/users/${targetUserId}`);
+                const data = await res.json().catch(() => ({}));
+
                 if (!res.ok) {
-                    setError(res.status === 404 ? 'User not found' : 'Failed to load profile');
+                    console.error(`[Profile][${requestId}] API Error:`, res.status, data);
+                    setError(data.message || `Server error (${res.status})`);
+                    // If we have a requestId from server, log it for support
+                    if (data.requestId) console.warn(`[Profile][${requestId}] Server Request ID: ${data.requestId}`);
                     return;
                 }
                 
-                const data = await res.json();
+                console.log(`[Profile][${requestId}] Success:`, data.username);
                 setProfile(data);
                 
-                // If logged in, check if currently following
-                if (user) {
-                    const checkFollowRes = await fetch(`/api/users/${targetUserId}/is-following`, { headers });
+                // If logged in, check follow status
+                if (user && auth.currentUser) {
+                    const token = await auth.currentUser.getIdToken();
+                    const checkFollowRes = await fetch(`/api/follow?checkFolloweeId=${targetUserId}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
                     if (checkFollowRes.ok) {
                         const followData = await checkFollowRes.json();
                         setIsFollowing(followData.isFollowing);
                     }
                 }
-            } catch (err) {
-                setError('Failed to load profile');
+            } catch (err: any) {
+                console.error(`[Profile][${requestId}] Network/Fetch error:`, err);
+                setError(`Network error: ${err.message || 'Check your connection'}`);
             } finally {
                 setLoading(false);
             }
@@ -66,9 +79,14 @@ export default function PublicProfilePage() {
             const token = await auth.currentUser?.getIdToken();
             const method = isFollowing ? 'DELETE' : 'POST';
             
-            const res = await fetch(`/api/users/${targetUserId}/follow`, {
+            const res = await fetch(`/api/follow`, {
                 method,
-                headers: { 'Authorization': `Bearer ${token}` }
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                // For DELETE we still need to send the followee_id in the body
+                body: JSON.stringify({ followee_id: targetUserId })
             });
 
             if (res.ok) {
@@ -142,7 +160,7 @@ export default function PublicProfilePage() {
                             </span>
                         </div>
 
-                        {!isOwnProfile && profile.role === 'EXPERT' && user?.role !== 'EXPERT' && user?.role !== 'ADMIN' && (
+                        {!isOwnProfile && profile.role === 'EXPERT' && (user?.role === 'FARMER' || user?.role === 'EXPERT') && (
                             <div className="mt-3">
                                 <button 
                                     onClick={handleFollowToggle} 
@@ -176,10 +194,17 @@ export default function PublicProfilePage() {
                             )}
                         </div>
 
-                        {profile.role === 'EXPERT' && profile.about && (
+                        {profile.role !== 'BUYER' && profile.farm_name && (
                             <div className="text-start mb-4 bg-light p-3 rounded-4 border">
-                                <label className="small fw-bold text-muted text-uppercase mb-2 d-block">About</label>
-                                <p className="small mb-0 text-dark" style={{ lineHeight: '1.6' }}>{profile.about}</p>
+                                <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Farm / Brand Name</label>
+                                <p className="small mb-0 text-dark" style={{ lineHeight: '1.6' }}>{profile.farm_name}</p>
+                            </div>
+                        )}
+                        
+                        {profile.location && (
+                            <div className="text-start mb-4 bg-light p-3 rounded-4 border">
+                                <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Location</label>
+                                <p className="small mb-0 text-dark" style={{ lineHeight: '1.6' }}>{profile.location}</p>
                             </div>
                         )}
                     </div>

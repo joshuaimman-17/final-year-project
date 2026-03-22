@@ -1,0 +1,19 @@
+{
+  "count": 2,
+  "users": [
+    {
+      "id": "c2U2eQH218eF8qV7lZ0S1JW2YqN2",
+      "email": "ksdharanidharan2005@gmail.com",
+      "username": "ksdharanidharan2005",
+      "role": "ADMIN",
+      "created_at": "2026-03-04T19:03:52.038Z"
+    },
+    {
+      "id": "BHSIP7YMSHUv1FIQ8XH9R0eMMfz1",
+      "email": "dharanidharan2005edu@gmail.com",
+      "username": "dharanidharan2005edu",
+      "role": "FARMER",
+      "created_at": "2026-03-04T19:03:51.442Z"
+    }
+  ]
+}

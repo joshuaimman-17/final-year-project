@@ -46,6 +46,14 @@ export async function POST(req: NextRequest) {
         }
         
         const userId = decodedToken.uid || decodedToken.phone_number;
+        
+        // Check role from database
+        const { default: neonSql } = await import('@/lib/neon');
+        const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
+        if (!userRole[0] || userRole[0].role === 'BUYER') {
+            return NextResponse.json({ message: 'Forbidden: Buyers cannot create market listings' }, { status: 403 });
+        }
+
         const db = admin.firestore();
         const body = await req.json();
 

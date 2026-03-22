@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
     const decodedToken = await verifyAuth(req);
     if (!decodedToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-    const callerRows = await neonSql`SELECT role FROM users WHERE id = ${decodedToken.phone_number || decodedToken.uid}`;
+    const callerRows = await neonSql`SELECT role FROM users WHERE id = ${decodedToken.uid}`;
     if (!callerRows[0] || callerRows[0].role !== 'ADMIN') {
         return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const decodedToken = await verifyAuth(req);
     if (!decodedToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-    const userId = decodedToken.phone_number || decodedToken.uid;
+    const userId = decodedToken.uid;
 
     // Check for existing pending or already approved application
     const existing = await neonSql`SELECT status FROM expert_requests WHERE user_id = ${userId} AND status IN ('pending', 'approved')`;
@@ -55,7 +55,7 @@ export async function PATCH(req: NextRequest) {
     const decodedToken = await verifyAuth(req);
     if (!decodedToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-    const callerRows = await neonSql`SELECT role FROM users WHERE id = ${decodedToken.phone_number || decodedToken.uid}`;
+    const callerRows = await neonSql`SELECT role FROM users WHERE id = ${decodedToken.uid}`;
     if (!callerRows[0] || callerRows[0].role !== 'ADMIN') {
         return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }

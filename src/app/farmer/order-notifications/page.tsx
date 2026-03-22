@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
-import { Icon } from '@/components/Icon';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import { BottomNav } from '@/components/BottomNav';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { useToast } from '@/components/common/ToastContext';
+import { Icon } from '@/components/ui/Icon';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
+import { BottomNav } from '@/components/common/BottomNav';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 

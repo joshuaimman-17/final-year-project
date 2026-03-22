@@ -30,7 +30,7 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files
 .env*
 
 # vercel
@@ -45,4 +45,24 @@ upload_test_v3_result.json
 *.tsbuildinfo
 next-env.d.ts
 
-.vercel
+# Logs and debug output
+*.log
+*_output.txt
+*_results.txt
+*_audit.js
+*_audit.json
+*_dump.txt
+*_dump.json
+debug_*.txt
+lint_*.txt
+
+# Temporary debug scripts (root level)
+/tmp/
+db_*.js
+role_*.js
+list_*.js
+print_*.js
+fk_*.js
+dump_*.js
+fix_*.js
+check_*.js

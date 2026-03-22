@@ -1,17 +1,18 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { BottomNav } from '@/components/BottomNav';
-import { Icon } from '@/components/Icon';
-import { useAuth } from '@/context/AuthContext';
-import { useToast } from '@/context/ToastContext';
+import { BottomNav } from '@/components/common/BottomNav';
+import { Icon } from '@/components/ui/Icon';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { useToast } from '@/components/common/ToastContext';
 import { EncryptionService } from '@/lib/encryption';
-import ProtectedRoute from '@/components/ProtectedRoute';
+import ProtectedRoute from '@/features/auth/components/ProtectedRoute';
 import { auth } from '@/lib/firebase';
 import { io, Socket } from 'socket.io-client';
-import { ChatSidebar } from '@/components/chat/ChatSidebar';
-import { MessageBubble } from '@/components/chat/MessageBubble';
-import { ChatInput } from '@/components/chat/ChatInput';
+import { ChatSidebar } from '@/features/chat/components/ChatSidebar';
+import { MessageBubble } from '@/features/chat/components/MessageBubble';
+import { ChatInput } from '@/features/chat/components/ChatInput';
+import { useRouter } from 'next/navigation';
 
 // ─── Key helpers ─────────────────────────────────────────────────────────────
 /**
@@ -251,32 +252,10 @@ function ChatContent() {
         }
     };
 
+    const router = useRouter();
+
     const fetchUserProfile = async (userId: string) => {
-        console.log(`[Chat] Fetching profile for user: ${userId}`);
-        window.alert(`Checking profile for user ID: ${userId}`); // Debug Alert
-        showToast("Fetching user profile...", "info");
-        setProfileLoading(true);
-        try {
-            const token = await getValidToken();
-            const res = await fetch(`/api/users/${userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (res.ok) {
-                const data = await res.json();
-                console.log(`[Chat] Profile data successfully received for ${userId}:`, data);
-                showToast(`Profile loaded: ${data.full_name || data.username}`, "success");
-                setViewingProfile(data);
-            } else {
-                const errorText = await res.text();
-                console.error(`[Chat] Profile fetch failed for ${userId}. Status: ${res.status}, Body: ${errorText}`);
-                showToast(`Failed to load profile: ${res.status}`, "error");
-            }
-        } catch (e) {
-            console.error("[Chat] Profile fetch failed", e);
-            showToast("Error loading profile", "error");
-        } finally {
-            setProfileLoading(false);
-        }
+        router.push(`/profile/${userId}`);
     };
 
     // ── 2. Fetch users ────────────────────────────────────────────────────────

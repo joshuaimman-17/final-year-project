@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '@/context/AuthContext';
-import { Icon } from '@/components/Icon';
+import { useAuth } from '@/features/auth/context/AuthContext';
+import { Icon } from '@/components/ui/Icon';
 
 const COUNTRY_CODES = [
     { code: '+91', label: 'IN' },
@@ -20,7 +20,6 @@ const ROLE_OPTIONS = [
     { id: 'BUYER', title: 'Buyer (Customer)', icon: 'person', desc: 'Browse and buy fresh produce' },
     { id: 'FARMER', title: 'Farmer', icon: 'agriculture', desc: 'Sell your crops and manage orders' },
     { id: 'EXPERT', title: 'Expert', icon: 'psychology', desc: 'Provide agricultural guidance' },
-    { id: 'ADMIN', title: 'Admin', icon: 'admin_panel_settings', desc: 'Manage the platform' },
 ];
 
 export default function SignupPage() {
@@ -37,18 +36,36 @@ export default function SignupPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const { signup, loginWithGoogle } = useAuth();
+    const { user, signup, loginWithGoogle } = useAuth();
     const router = useRouter();
 
+    // ── Redirect once user is resolved ──
+    useEffect(() => {
+        if (!user) return;
+        
+        const r = user.role?.toUpperCase();
+        console.log(`[Signup] Redirecting user with role: ${r}`);
+        
+        switch (r) {
+            case 'ADMIN': router.replace('/admin/dashboard'); break;
+            case 'FARMER': router.replace('/farmer/dashboard'); break;
+            case 'EXPERT': router.replace('/expert/dashboard'); break;
+            case 'BUYER': router.replace('/marketplace'); break;
+            default: router.replace('/');
+        }
+    }, [user, router]);
+
     const handleGoogleSignup = async () => {
+        setLoading(true);
+        setError('');
         try {
             console.log("Starting Google Signup...");
             await loginWithGoogle();
-            console.log("Google Signup successful, redirecting...");
-            router.push('/');
         } catch (err: any) {
             console.error("Google Signup Error:", err);
             setError(err.message || 'Google signup failed');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -68,8 +85,7 @@ export default function SignupPage() {
 
         try {
             await signup(email, password, name, farmName || 'My Farm', fullPhoneNumber, username, role);
-            console.log("Email Signup successful, redirecting...");
-            router.push('/');
+            console.log("Email Signup successful, waiting for sync...");
         } catch (err: any) {
             console.error("Email Signup Error:", err);
             setError(err.message || 'Failed to create account');

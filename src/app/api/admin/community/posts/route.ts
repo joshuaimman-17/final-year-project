@@ -8,7 +8,7 @@ async function checkAdmin(req: NextRequest) {
     const decodedToken = await verifyAuth(req);
     if (!decodedToken) return null;
 
-    const userId = decodedToken.phone_number || decodedToken.uid;
+    const userId = decodedToken.uid;
     const rows = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
     
     if (rows[0]?.role === 'ADMIN' || decodedToken.email?.toLowerCase() === 'ksdharanidharan2005@gmail.com') {
