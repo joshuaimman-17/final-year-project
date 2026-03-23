@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/features/auth/context/AuthContext';
-
+import { getAuth } from 'firebase/auth';
 interface Comment {
     id: string;
     postId: string;
@@ -73,9 +73,13 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
         ));
 
         try {
+            const token = await getAuth().currentUser?.getIdToken();
             const res = await fetch(`/api/community/comments/${comment.id}/like`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({ action: newLiked ? 'like' : 'unlike' })
             });
             if (!res.ok) throw new Error('Failed to toggle like');
@@ -97,9 +101,13 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
 
         setSubmitting(true);
         try {
+            const token = await getAuth().currentUser?.getIdToken();
             const res = await fetch('/api/community/comments', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
                 body: JSON.stringify({
                     postId,
                     parentId: customParentId || parentId,
@@ -159,8 +167,8 @@ export const CommentSection: React.FC<CommentSectionProps> = ({ postId, parentId
 
             {/* Comments List */}
             <div className="d-grid gap-3">
-                {comments.map(comment => (
-                    <div key={comment.id} className="comment">
+                {comments.map((comment, index) => (
+                    <div key={comment.id || `comment-${index}`} className="comment">
                         <div className="d-flex gap-2">
                             <div className="rounded-circle bg-secondary-subtle d-flex align-items-center justify-content-center flex-shrink-0" style={{ width: '30px', height: '30px' }}>
                                 {comment.authorAvatar ? (

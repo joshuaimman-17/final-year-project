@@ -6,47 +6,33 @@ import Link from 'next/link';
 import { useAuth } from '@/features/auth/context/AuthContext';
 import { Icon } from '@/components/ui/Icon';
 
-export default function LoginPage() {
+export default function BuyerLoginPage() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    // Track if redirect has already been triggered to avoid double-fires
     const redirected = useRef(false);
 
     const { user, login, loginWithGoogle, loading: authLoading } = useAuth();
     const router = useRouter();
     const isProcessing = loading || authLoading;
 
-    // ── Redirect once BACKEND sync is done and user is fully resolved ──
-    // Wait until authLoading is false so we use the final backend role,
-    // not the stale localStorage value.
     useEffect(() => {
-        if (authLoading) return;       // still syncing, wait
-        if (!user) return;             // not logged in
-        if (redirected.current) return; // already redirected, skip
+        if (authLoading) return;
+        if (!user) return;
+        if (redirected.current) return;
 
         redirected.current = true;
         const role = user.role?.toUpperCase();
-        console.log(`[Login] Redirecting user with role: ${role}`);
 
         switch (role) {
-            case 'ADMIN':
-                router.replace('/admin/dashboard');
-                break;
-            case 'FARMER':
-                router.replace('/farmer/dashboard');
-                break;
-            case 'EXPERT':
-                router.replace('/expert/dashboard');
-                break;
-            case 'BUYER':
-                router.replace('/marketplace');
-                break;
-            default:
-                router.replace('/');
+            case 'ADMIN': router.replace('/admin/dashboard'); break;
+            case 'FARMER': router.replace('/farmer/dashboard'); break;
+            case 'EXPERT': router.replace('/expert/dashboard'); break;
+            case 'BUYER': router.replace('/marketplace'); break;
+            default: router.replace('/');
         }
     }, [user, authLoading, router]);
 
@@ -54,12 +40,10 @@ export default function LoginPage() {
         e.preventDefault();
         setLoading(true);
         setError('');
-        redirected.current = false; // reset for fresh login
+        redirected.current = false;
         try {
             await login(email, password);
-            // Redirect is handled by useEffect above once sync completes
         } catch (err: any) {
-            console.error("[Login] Failed:", err);
             setError(err.message || 'Login failed. Please check your credentials.');
         } finally {
             setLoading(false);
@@ -71,7 +55,7 @@ export default function LoginPage() {
         setError('');
         redirected.current = false;
         try {
-            await loginWithGoogle();
+            await loginWithGoogle('BUYER');
         } catch (err: any) {
             setError(err.message || 'Google sign-in failed. Please try again.');
         } finally {
@@ -79,11 +63,9 @@ export default function LoginPage() {
         }
     };
 
-    // Show full-page spinner while checking auth state on initial load
     if (authLoading && !user) {
         return (
-            <div className="min-vh-100 d-flex align-items-center justify-content-center"
-                 style={{ background: 'linear-gradient(135deg, #f1f8e9 0%, #c5e1a5 100%)' }}>
+            <div className="min-vh-100 d-flex align-items-center justify-content-center bg-light">
                 <div className="text-center">
                     <div className="spinner-border text-success mb-3" role="status" style={{ width: '3rem', height: '3rem' }}></div>
                     <p className="text-muted small">Checking session...</p>
@@ -93,42 +75,37 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-vh-100 d-flex align-items-center justify-content-center p-3" 
-             style={{ background: 'linear-gradient(135deg, #f1f8e9 0%, #c5e1a5 100%)' }}>
+        <div className="min-vh-100 d-flex align-items-center justify-content-center p-3 bg-light border-top border-success border-5">
             
             <div className="card border-0 shadow-lg rounded-4 overflow-hidden mx-auto w-100" style={{ maxWidth: '420px' }}>
                 <div className="bg-success py-4 text-center">
                     <div className="mx-auto rounded-circle d-flex align-items-center justify-content-center bg-white text-success mb-2 shadow-sm" style={{ width: '60px', height: '60px' }}>
-                        <Icon name="eco" className="fs-2" filled />
+                        <Icon name="shopping_cart" className="fs-2" filled />
                     </div>
-                    <h1 className="h4 fw-bold text-white mb-0">Dr.Plant</h1>
-                    <p className="text-white-50 small mb-0">Secure Agriculture Portal</p>
+                    <h1 className="h4 fw-bold text-white mb-0">Buyer Login</h1>
+                    <p className="text-white-50 small mb-0">Dr.Plant Marketplace</p>
                 </div>
 
                 <div className="card-body p-4 p-md-5 bg-white">
                     {error && (
-                        <div className="alert alert-danger d-flex align-items-center gap-2 py-2 small border-0 rounded-3 mb-4">
-                            <Icon name="error" style={{ fontSize: '18px' }} />
+                        <div className="alert alert-danger py-2 small border-0 rounded-3 mb-4">
                             {error}
                         </div>
                     )}
 
                     <form onSubmit={handleEmailLogin} className="d-grid gap-4">
                         <div className="form-group">
-                            <label className="form-label small fw-bold text-dark mb-1">Email or Username</label>
-                            <div className="input-group">
-                                <span className="input-group-text bg-light border-0 text-muted">@</span>
-                                <input 
-                                    type="text" 
-                                    className="form-control form-control-lg bg-light border-0 fs-6 shadow-none" 
-                                    placeholder="yourname@farm.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                    disabled={isProcessing}
-                                    autoComplete="email"
-                                />
-                            </div>
+                            <label className="form-label small fw-bold text-dark mb-1">Email</label>
+                            <input 
+                                type="text" 
+                                className="form-control form-control-lg bg-light border-0 fs-6 shadow-none" 
+                                placeholder="you@example.com"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                                disabled={isProcessing}
+                                autoComplete="email"
+                            />
                         </div>
 
                         <div className="form-group">
@@ -137,12 +114,9 @@ export default function LoginPage() {
                                 <Link href="/forgot-password" style={{ color: '#2E7D32' }} className="small text-decoration-none fw-bold">Forgot?</Link>
                             </div>
                             <div className="input-group">
-                                <span className="input-group-text bg-light border-0 text-muted">
-                                    <Icon name="lock" style={{ fontSize: '18px' }} />
-                                </span>
                                 <input
                                     type={showPassword ? "text" : "password"}
-                                    className="form-control form-control-lg bg-light border-0 fs-6 shadow-none"
+                                    className="form-control form-control-lg bg-light border-0 fs-6 shadow-none pe-5"
                                     placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -152,10 +126,9 @@ export default function LoginPage() {
                                 />
                                 <button
                                     type="button"
-                                    className="btn btn-light border-0 text-muted px-3"
+                                    className="btn btn-light border-0 text-muted px-3 position-absolute end-0 top-50 translate-middle-y z-1"
                                     onClick={() => setShowPassword(!showPassword)}
                                     tabIndex={-1}
-                                    aria-label={showPassword ? "Hide password" : "Show password"}
                                 >
                                     <Icon name={showPassword ? "visibility" : "visibility_off"} style={{ fontSize: '18px' }} />
                                 </button>
@@ -198,7 +171,7 @@ export default function LoginPage() {
 
                     <button 
                         onClick={handleGoogleLogin} 
-                        disabled={isProcessing}  // fixed: was `loading` only, now covers authLoading too
+                        disabled={isProcessing}
                         className="btn btn-light border w-100 rounded-3 d-flex align-items-center justify-content-center gap-2 fw-bold mb-3" 
                         style={{ height: '52px' }}
                     >
@@ -212,10 +185,10 @@ export default function LoginPage() {
 
                     <div className="text-center mt-4">
                         <p className="text-muted small mb-0">
-                            New to Dr.Plant? <Link href="/signup" className="text-primary-green text-decoration-none fw-bold">Create Account</Link>
+                            New Buyer? <Link href="/buyer/signup" className="text-primary-green text-decoration-none fw-bold">Create Account</Link>
                         </p>
                         <p className="text-muted small mt-2">
-                            <Link href="/buyer/login" className="text-muted text-decoration-underline">Are you a buyer? Sign in here.</Link>
+                            <Link href="/login" className="text-muted text-decoration-underline">Not a buyer?</Link>
                         </p>
                     </div>
                 </div>

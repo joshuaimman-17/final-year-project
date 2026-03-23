@@ -53,7 +53,7 @@ export default function AdminDashboard() {
         setLoading(true);
         try {
             const token = await getToken();
-            const res = await fetch(`/api/admin/users?t=${Date.now()}`, { 
+            const res = await fetch(`/api/admin/users?t=${Date.now()}`, {
                 headers: { Authorization: `Bearer ${token}` },
                 cache: 'no-store'
             });
@@ -91,7 +91,7 @@ export default function AdminDashboard() {
     const handleRoleChange = async (userId: string, newRole: string) => {
         // Optimistic update
         const previousUsers = [...users];
-        setUsers(currentUsers => currentUsers.map(u => 
+        setUsers(currentUsers => currentUsers.map(u =>
             u.id === userId ? { ...u, role: newRole } : u
         ));
 
@@ -189,12 +189,12 @@ export default function AdminDashboard() {
             <header className="sticky-top bg-white border-bottom px-4 py-3 shadow-sm z-3">
                 <div className="d-flex align-items-center justify-content-between mx-auto w-100" style={{ maxWidth: '1200px' }}>
                     <div className="d-flex align-items-center gap-3">
-                        <button 
+                        <button
                             onClick={() => {
                                 // If they are at the dashboard, they likely want to go to the site home
                                 // but we should ensure we don't loop if they just came from '/'
-                                router.push('/'); 
-                            }} 
+                                router.push('/');
+                            }}
                             className="btn btn-light rounded-circle p-2 d-flex shadow-none border"
                             title="Back to Site Home"
                         >
@@ -262,7 +262,7 @@ export default function AdminDashboard() {
                                 { label: 'System Status', val: 'Online', icon: 'dns', color: 'success', action: null },
                             ].map((stat) => (
                                 <div key={stat.label} className="col-12 col-md-4 col-xl-2">
-                                    <div 
+                                    <div
                                         onClick={stat.action || undefined}
                                         className={`card border-0 shadow-sm rounded-4 p-3 h-100 transition-all ${stat.action ? 'cursor-pointer hover-scale' : ''}`}
                                     >
@@ -285,7 +285,7 @@ export default function AdminDashboard() {
                                         <div className="col-md-6">
                                             <div className="p-3 bg-light rounded-4 border">
                                                 <p className="text-muted small mb-1 fw-bold">PRIMARY ADMIN EMAIL</p>
-                                                <p className="font-monospace mb-0 text-danger fw-bold">ksdharanidharan2005@gmail.com</p>
+                                                <p className="font-monospace mb-0 text-danger fw-bold">{user.email}</p>
                                             </div>
                                         </div>
                                         <div className="col-md-6">
@@ -310,7 +310,7 @@ export default function AdminDashboard() {
                                 <div className="d-flex align-items-center gap-2">
                                     <div className="btn-group bg-light p-1 rounded-pill flex-wrap">
                                         {(['ALL', 'FARMER', 'EXPERT', 'ADMIN'] as const).map(roleKey => (
-                                            <button 
+                                            <button
                                                 key={roleKey}
                                                 onClick={() => setUserSubTab(roleKey)}
                                                 className={`btn btn-sm rounded-pill px-3 fw-bold border-0 ${userSubTab === roleKey ? 'bg-success text-white shadow-sm' : 'text-muted'}`}
@@ -338,56 +338,56 @@ export default function AdminDashboard() {
                                         {users
                                             .filter(u => userSubTab === 'ALL' || u.role === userSubTab)
                                             .map((u) => (
-                                            <tr key={u.id}>
-                                                <td className="px-4 py-3">
-                                                    <div className="d-flex align-items-center gap-3">
-                                                        <div className="rounded-circle bg-success-subtle text-success p-2 d-flex align-items-center justify-content-center fw-bold" style={{ width: '40px', height: '40px' }}>
-                                                            {u.full_name.charAt(0)}
+                                                <tr key={u.id}>
+                                                    <td className="px-4 py-3">
+                                                        <div className="d-flex align-items-center gap-3">
+                                                            <div className="rounded-circle bg-success-subtle text-success p-2 d-flex align-items-center justify-content-center fw-bold" style={{ width: '40px', height: '40px' }}>
+                                                                {u.full_name.charAt(0)}
+                                                            </div>
+                                                            <div>
+                                                                <p className="fw-bold mb-0">{u.full_name}</p>
+                                                                <p className="text-muted small mb-0">{u.email}</p>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <p className="fw-bold mb-0">{u.full_name}</p>
-                                                            <p className="text-muted small mb-0">{u.email}</p>
+                                                    </td>
+                                                    <td>
+                                                        <span className={`badge rounded-pill fw-bold ${badgeColor[u.role.toUpperCase()] || 'bg-light text-dark'}`} style={{ fontSize: '10px' }}>
+                                                            {u.role.toUpperCase()}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div className="d-flex align-items-center gap-2">
+                                                            <span className={`rounded-circle ${u.status === 'blocked' ? 'bg-danger' : 'bg-success'} d-block`} style={{ width: '8px', height: '8px' }}></span>
+                                                            <span className="small text-muted fw-bold">{u.status === 'blocked' ? 'Blocked' : 'Active'}</span>
                                                         </div>
-                                                    </div>
-                                                </td>
-                                                <td>
-                                                    <span className={`badge rounded-pill fw-bold ${badgeColor[u.role.toUpperCase()] || 'bg-light text-dark'}`} style={{ fontSize: '10px' }}>
-                                                        {u.role.toUpperCase()}
-                                                    </span>
-                                                </td>
-                                                <td>
-                                                    <div className="d-flex align-items-center gap-2">
-                                                        <span className={`rounded-circle ${u.status === 'blocked' ? 'bg-danger' : 'bg-success'} d-block`} style={{ width: '8px', height: '8px' }}></span>
-                                                        <span className="small text-muted fw-bold">{u.status === 'blocked' ? 'Blocked' : 'Active'}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 text-end">
-                                                    {u.email !== 'ksdharanidharan2005@gmail.com' ? (
-                                                        <div className="d-flex align-items-center justify-content-end gap-2">
-                                                            <select 
-                                                                className="form-select form-select-sm border-0 bg-light shadow-none fw-bold" 
-                                                                style={{ width: '130px', fontSize: '12px' }}
-                                                                value={u.role.toUpperCase()}
-                                                                onChange={(e) => handleRoleChange(u.id, e.target.value.toUpperCase())}
-                                                            >
-                                                                <option value="BUYER">Buyer</option>
-                                                                <option value="FARMER">Farmer</option>
-                                                                <option value="EXPERT">Expert</option>
-                                                                <option value="ADMIN">Admin</option>
-                                                            </select>
-                                                            <button onClick={() => handleBlockUser(u.id, u.status || 'active')} className="btn btn-light btn-sm rounded-circle p-2 text-warning border shadow-none me-1" title={u.status === 'blocked' ? "Unblock User" : "Block User"}>
-                                                                <span className="material-symbols-outlined fs-5">{u.status === 'blocked' ? 'lock_open' : 'block'}</span>
-                                                            </button>
-                                                            <button onClick={() => handleDeleteUser(u.id)} className="btn btn-light btn-sm rounded-circle p-2 text-danger border shadow-none" title="Delete User">
-                                                                <span className="material-symbols-outlined fs-5">delete</span>
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="badge bg-danger rounded-pill fw-bold" style={{ fontSize: '10px' }}>PROTECTED</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
+                                                    </td>
+                                                    <td className="px-4 text-end">
+                                                        {u.email !== 'ksdharanidharan2005@gmail.com' ? (
+                                                            <div className="d-flex align-items-center justify-content-end gap-2">
+                                                                <select
+                                                                    className="form-select form-select-sm border-0 bg-light shadow-none fw-bold"
+                                                                    style={{ width: '130px', fontSize: '12px' }}
+                                                                    value={u.role.toUpperCase()}
+                                                                    onChange={(e) => handleRoleChange(u.id, e.target.value.toUpperCase())}
+                                                                >
+                                                                    <option value="BUYER">Buyer</option>
+                                                                    <option value="FARMER">Farmer</option>
+                                                                    <option value="EXPERT">Expert</option>
+                                                                    <option value="ADMIN">Admin</option>
+                                                                </select>
+                                                                <button onClick={() => handleBlockUser(u.id, u.status || 'active')} className="btn btn-light btn-sm rounded-circle p-2 text-warning border shadow-none me-1" title={u.status === 'blocked' ? "Unblock User" : "Block User"}>
+                                                                    <span className="material-symbols-outlined fs-5">{u.status === 'blocked' ? 'lock_open' : 'block'}</span>
+                                                                </button>
+                                                                <button onClick={() => handleDeleteUser(u.id)} className="btn btn-light btn-sm rounded-circle p-2 text-danger border shadow-none" title="Delete User">
+                                                                    <span className="material-symbols-outlined fs-5">delete</span>
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <span className="badge bg-danger rounded-pill fw-bold" style={{ fontSize: '10px' }}>PROTECTED</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
                                     </tbody>
                                 </table>
                             </div>

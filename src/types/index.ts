@@ -93,6 +93,9 @@ export interface Product {
     rating?: number;
     reviews?: number;
     on_sale?: boolean;
+    farm_name?: string;
+    farmer_name?: string;
+    farmer_id?: string;
 }
 
 export interface Post {

@@ -264,6 +264,7 @@ export default function SignupPage() {
 
                 <div className="text-center mt-4 pt-2">
                     <p className="text-muted mb-0">Already have an account? <Link href="/login" className="text-primary-green text-decoration-none fw-bold">Sign In</Link></p>
+                    <p className="text-muted mb-0 mt-3 small"><Link href="/buyer/signup" className="text-muted text-decoration-underline">Looking to buy products? Create a Buyer Account.</Link></p>
                 </div>
             </div>
         </div>

@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/features/auth/context/AuthContext';
+import { getAuth } from 'firebase/auth';
 
 interface CreatePostModalProps {
     onClose: () => void;
@@ -44,8 +45,10 @@ export const CreatePostModal: React.FC<CreatePostModalProps> = ({ onClose, onPos
                 formData.append('image', image);
             }
 
+            const token = await getAuth().currentUser?.getIdToken();
             const res = await fetch('/api/community/posts', {
                 method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
                 body: formData,
             });
 

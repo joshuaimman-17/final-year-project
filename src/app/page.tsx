@@ -159,9 +159,12 @@ function DashboardContent() {
       
       // Removed automatic redirection to allow admins/experts to view the home page.
       // Navigation to dashboards is now handled via header buttons.
+      if (userRole === 'BUYER') {
+          router.replace('/marketplace');
+      }
 
       return () => clearInterval(timer);
-    }, [user, router, isAdmin, isExpert, loading, mounted]);
+    }, [userRole, router, isAdmin, isExpert, loading, mounted]);
 
   if (!mounted || !currentTime) return null;
 

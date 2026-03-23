@@ -72,15 +72,6 @@ export async function POST(req: NextRequest) {
         const decodedToken = await verifyAuth(req);
         if (!decodedToken) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-        const userId = decodedToken.phone_number || decodedToken.uid;
-        
-        // Import neonSql dynamically or ensure it's available. 
-        // We'll use the existing pattern of checking role from Postgres.
-        const { default: neonSql } = await import('@/lib/neon');
-        const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
-        if (!userRole[0]) {
-            return NextResponse.json({ message: 'User not found in role checks' }, { status: 403 });
-        }
 
         const formData = await req.formData();
         const content = formData.get('content') as string;

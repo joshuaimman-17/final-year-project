@@ -265,13 +265,24 @@ function ChatContent() {
         try {
             const res = await fetch('/api/users', { headers: { 'Authorization': `Bearer ${token}` } });
             const data = await res.json();
+            
+            // Fetch unread count for current user
+            const unreadRes = await fetch('/api/chat/unread', { headers: { 'Authorization': `Bearer ${token}` } });
+            let unreadData: Record<string, number> = {};
+            if (unreadRes.ok) {
+                unreadData = await unreadRes.json();
+            }
+
             if (data.users && Array.isArray(data.users)) {
                 const myId = getCurrentUserId() || user?.id;
                 // Only include EXPERT, ADMIN, FARMER. Exclude BUYER.
                 setAllUsers(data.users.filter((u: any) => 
                     u.id !== myId && 
                     u.role !== 'BUYER'
-                ));
+                ).map((u: any) => ({
+                    ...u,
+                    unreadCount: unreadData[u.id] || 0
+                })));
             }
         } catch (e) {
             console.error("[Chat] Failed to fetch users", e);
@@ -298,6 +309,18 @@ function ChatContent() {
             const myId = getCurrentUserId();
             const token = await getValidToken();
 
+            // Optimitically clear unread count for this user
+            setAllUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, unreadCount: 0 } : u));
+            
+            // Mark as read in backend
+            if (token) {
+                fetch('/api/chat/read', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ senderId: selectedUser.id })
+                }).catch(e => console.error("Failed to mark as read:", e));
+            }
+
             // Proactive check for recipient encryption status (Encoded)
             try {
                 const params = new URLSearchParams({ userId: selectedUser.id });
@@ -320,7 +343,21 @@ function ChatContent() {
                 if (msg.sender_id === selectedUser.id || msg.receiver_id === selectedUser.id) {
                     const text = await decryptMessage(msg, myId);
                     setMessages(prev => [...prev, { ...msg, text }]);
+                    
+                    // Mark as read immediately if it's from the active chat
+                    if (msg.sender_id === selectedUser.id && token) {
+                        fetch('/api/chat/read', {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ senderId: selectedUser.id })
+                        }).catch(e => console.error(e));
+                    }
                     scrollToBottom();
+                } else if (msg.receiver_id === myId) {
+                    // Update unread count for the sender
+                    setAllUsers(prev => prev.map(u => 
+                        u.id === msg.sender_id ? { ...u, unreadCount: (u.unreadCount || 0) + 1 } : u
+                    ));
                 }
             });
 

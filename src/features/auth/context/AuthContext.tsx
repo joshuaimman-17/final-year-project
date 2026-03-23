@@ -23,7 +23,7 @@ interface AuthContextType {
     locationLoading: boolean;
     signup: (email: string, pass: string, name: string, farm: string, phoneNumber: string, username: string, role: string) => Promise<void>;
     login: (email: string, pass: string) => Promise<void>;
-    loginWithGoogle: () => Promise<void>;
+    loginWithGoogle: (role?: string) => Promise<void>;
     logout: () => Promise<void>;
     resetPassword: (email: string) => Promise<void>;
     updateLocation: (lat: number, lon: number) => void;
@@ -228,8 +228,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const loginWithGoogle = async () => {
+    const loginWithGoogle = async (role?: string) => {
         try {
+            if (role) {
+                pendingSignupData.current = { role };
+            }
             await signInWithPopup(auth, googleProvider);
             // Sync handled by listener
         } catch (error: any) {

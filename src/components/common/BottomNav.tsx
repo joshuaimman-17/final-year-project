@@ -49,6 +49,13 @@ export const BottomNav: React.FC = () => {
                         <NavItem path="/field" icon="landscape" label="Field" />
                         <NavItem path="/profile" icon="person" label="Profile" />
                     </>
+                ) : role === 'BUYER' ? (
+                    <>
+                        <NavItem path="/marketplace" icon="storefront" label="Home" />
+                        <NavItem path="/buyer/cart" icon="shopping_cart" label="Cart" />
+                        <NavItem path="/buyer/orders" icon="receipt_long" label="Orders" />
+                        <NavItem path="/buyer/profile" icon="person" label="Profile" />
+                    </>
                 ) : (
                     <>
                         <NavItem path="/" icon="dashboard" label="Home" />

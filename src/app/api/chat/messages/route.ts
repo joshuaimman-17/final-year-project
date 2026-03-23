@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import neonSql from '@/lib/neon';
 import { verifyAuth } from '@/lib/authHelper';
+import { sendPushNotification } from '@/lib/notifications';
 
 // GET: Fetch conversation messages for the current user
 export async function GET(req: NextRequest) {
@@ -53,10 +54,12 @@ export async function POST(req: NextRequest) {
     const userId = decodedToken.phone_number || decodedToken.uid;
 
     // Check role from database
-    const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
+    const userRole = await neonSql`SELECT role, full_name FROM users WHERE id = ${userId}`;
     if (!userRole[0] || userRole[0].role === 'BUYER') {
         return NextResponse.json({ message: 'Forbidden: Buyers cannot send messages' }, { status: 403 });
     }
+
+    const senderName = userRole[0].full_name || 'Someone';
 
     const { receiverId, encryptedContent } = await req.json();
 
@@ -70,6 +73,15 @@ export async function POST(req: NextRequest) {
             VALUES (${userId}, ${receiverId}, ${encryptedContent})
             RETURNING *
         `;
+
+        // Send push notification to receiver asynchronously
+        // We don't await this so it doesn't block the API response
+        sendPushNotification(
+            receiverId,
+            `New message from ${senderName}`,
+            'You received a new secure message.',
+            { type: 'chat', senderId: userId }
+        ).catch(err => console.error('Background notification failed:', err));
 
         return NextResponse.json(result[0]);
     } catch (error: any) {
