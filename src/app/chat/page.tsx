@@ -267,7 +267,11 @@ function ChatContent() {
             const data = await res.json();
             if (data.users && Array.isArray(data.users)) {
                 const myId = getCurrentUserId() || user?.id;
-                setAllUsers(data.users.filter((u: any) => u.id !== myId));
+                // Only include EXPERT, ADMIN, FARMER. Exclude BUYER.
+                setAllUsers(data.users.filter((u: any) => 
+                    u.id !== myId && 
+                    u.role !== 'BUYER'
+                ));
             }
         } catch (e) {
             console.error("[Chat] Failed to fetch users", e);
@@ -1009,7 +1013,7 @@ function ChatContent() {
 
 export default function ChatPage() {
     return (
-        <ProtectedRoute allowedRoles={['FARMER', 'EXPERT', 'ADMIN']}>
+        <ProtectedRoute allowedRoles={['EXPERT', 'ADMIN', 'FARMER']}>
             <ChatContent />
         </ProtectedRoute>
     );

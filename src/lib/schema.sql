@@ -13,12 +13,21 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT,
     username TEXT NOT NULL UNIQUE,
     full_name TEXT,
-    role TEXT NOT NULL DEFAULT 'BUYER', -- 'BUYER', 'FARMER', 'EXPERT', 'ADMIN'
+    role TEXT NOT NULL DEFAULT 'FARMER', -- 'FARMER', 'EXPERT', 'ADMIN'
     farm_name TEXT,
     location TEXT,
     latitude DECIMAL(10, 8),
     longitude DECIMAL(11, 8),
     avatar_url TEXT,
+    about TEXT,
+    skills TEXT,
+    experience TEXT,
+    projects TEXT,
+    achievements TEXT,
+    portfolio_link TEXT,
+    expert_status TEXT DEFAULT 'none',
+    follower_count INTEGER DEFAULT 0,
+    following_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

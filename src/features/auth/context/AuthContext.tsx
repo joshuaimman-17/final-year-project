@@ -97,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         const stored = localStorage.getItem(`${USER_DATA_KEY}_${idForDb}`);
                         const cached = (stored ? JSON.parse(stored) : null) || pendingSignupData.current;
 
-                        const resolvedRole = isAdminEmail ? 'ADMIN' : (cached?.role || 'BUYER');
+                        const resolvedRole = isAdminEmail ? 'ADMIN' : (cached?.role || 'FARMER');
                         console.log(`[Auth] Initial role check for ${fbUser.email}: isAdminEmail=${isAdminEmail}, cachedRole=${cached?.role}, resolved=${resolvedRole}`);
                         
                         if (cached && !user) {
@@ -134,7 +134,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 lastSyncRef.current = Date.now();
                                 retryCountRef.current[idForDb] = 0; // Reset retries on success
 
-                                const finalRole = isAdminEmail ? 'ADMIN' : (profile.role || 'BUYER');
+                                const finalRole = isAdminEmail ? 'ADMIN' : (profile.role || 'FARMER');
                                 console.log(`[Auth] Backend sync role for ${fbUser.email}: profile.role=${profile.role}, final=${finalRole}`);
                                 
                                 const updatedUser = {
@@ -394,7 +394,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     if (res.ok) {
                         const { user: profile } = await res.json();
                         const isAdminEmail = fbUser.email?.toLowerCase() === 'ksdharanidharan2005@gmail.com';
-                        const dbRole = (profile.role || 'BUYER').toUpperCase();
+                        const dbRole = (profile.role || 'FARMER').toUpperCase();
                         const finalRole = isAdminEmail ? 'ADMIN' : dbRole;
 
                         setUser(prev => {

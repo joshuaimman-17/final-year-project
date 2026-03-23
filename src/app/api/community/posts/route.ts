@@ -78,8 +78,8 @@ export async function POST(req: NextRequest) {
         // We'll use the existing pattern of checking role from Postgres.
         const { default: neonSql } = await import('@/lib/neon');
         const userRole = await neonSql`SELECT role FROM users WHERE id = ${userId}`;
-        if (!userRole[0] || userRole[0].role === 'BUYER') {
-            return NextResponse.json({ message: 'Forbidden: Buyers cannot post to community' }, { status: 403 });
+        if (!userRole[0]) {
+            return NextResponse.json({ message: 'User not found in role checks' }, { status: 403 });
         }
 
         const formData = await req.formData();

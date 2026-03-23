@@ -66,16 +66,28 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updated = await neonSql`
-        UPDATE expert_requests SET status = ${status} WHERE id = ${requestId} RETURNING user_id
+        UPDATE expert_requests SET status = ${status} WHERE id = ${requestId} RETURNING user_id, skills, experience, portfolio_link
     `;
-    const userId = updated[0]?.user_id;
+    const details = updated[0];
 
-    if (userId) {
+    if (details) {
         // Update user's expert_status and role accordingly
-        const newRole = status === 'approved' ? 'EXPERT' : 'CUSTOMER';
-        await neonSql`
-            UPDATE users SET expert_status = ${status}, role = ${newRole} WHERE id = ${userId}
-        `;
+        const newRole = status === 'approved' ? 'EXPERT' : 'FARMER';
+        if (status === 'approved') {
+            await neonSql`
+                UPDATE users 
+                SET expert_status = ${status}, 
+                    role = ${newRole},
+                    skills = ${details.skills},
+                    experience = ${details.experience},
+                    portfolio_link = ${details.portfolio_link}
+                WHERE id = ${details.user_id}
+            `;
+        } else {
+            await neonSql`
+                UPDATE users SET expert_status = ${status}, role = ${newRole} WHERE id = ${details.user_id}
+            `;
+        }
     }
 
     return NextResponse.json({ message: `Application ${status}` });

@@ -28,11 +28,9 @@ export async function GET(req: NextRequest) {
 
         const data = fieldSnap.docs[0].data();
         return NextResponse.json({
-            field: {
-                id: fieldSnap.docs[0].id,
-                ...data,
-                createdAt: data.createdAt?.toDate() || new Date()
-            }
+            field: data.config ? data.config[0] : null, // For backward compatibility if needed
+            configs: data.config || [],
+            id: fieldSnap.docs[0].id
         });
     } catch (error: any) {
         console.error('Fetch Field Error:', error);
@@ -56,30 +54,28 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { latitude, longitude, terrainType, soilType, soilPh, soilMoisture, elevation } = body;
+        const { configs, latitude, longitude } = body;
 
-        if (latitude === undefined || longitude === undefined) {
-            return NextResponse.json({ message: 'Latitude and Longitude are required' }, { status: 400 });
+        if (!configs || !Array.isArray(configs)) {
+            return NextResponse.json({ message: 'Configs array is required' }, { status: 400 });
         }
 
         const db = admin.firestore();
         
-        // Find if they already have a field to update, or create a new one
-        const existingSnap = await db.collection('user_fields').where('userId', '==', userId).limit(1).get();
+        // Use the primary configuration (first one) for top-level search/filtering if needed
+        const primary = configs[0] || {};
         
         const fieldData = {
             userId,
-            latitude,
-            longitude,
-            terrainType: terrainType || 'Unknown',
-            soilType: soilType || 'Unknown',
-            soilPh: soilPh || 0,
-            soilMoisture: soilMoisture || 0,
-            elevation: elevation || 0,
+            latitude: latitude || 0,
+            longitude: longitude || 0,
+            config: configs, // Store the full array
             updatedAt: admin.firestore.FieldValue.serverTimestamp()
         };
 
         let docId = '';
+        const existingSnap = await db.collection('user_fields').where('userId', '==', userId).limit(1).get();
+        
         if (!existingSnap.empty) {
             docId = existingSnap.docs[0].id;
             await db.collection('user_fields').doc(docId).update(fieldData);
@@ -92,7 +88,7 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        return NextResponse.json({ message: 'Field saved successfully', id: docId, field: fieldData }, { status: 200 });
+        return NextResponse.json({ message: 'Field saved successfully', id: docId, configs }, { status: 200 });
 
     } catch (error: any) {
         console.error('Save Field Error:', error);

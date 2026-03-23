@@ -21,8 +21,16 @@ export const AlertsPanel: React.FC<AlertsPanelProps> = ({ sm, loading }) => {
                 <div className="alert alert-danger border-danger border-2 rounded-4 shadow-sm d-flex align-items-start gap-3 p-3 mb-4 animate-fade-in">
                     <Icon name="warning" className="text-danger mt-1 flex-shrink-0" style={{ fontSize: 24 }} />
                     <div>
-                        <h4 className="h6 fw-bold mb-1 lh-sm">Low Moisture Alert</h4>
+                        <div className="d-flex align-items-center justify-content-between">
+                            <h4 className="h6 fw-bold mb-1 lh-sm">Low Moisture Alert</h4>
+                            <span className="badge bg-white text-danger border border-danger border-opacity-25 rounded-pill d-flex align-items-center gap-1" style={{ fontSize: 8 }}>
+                                <Icon name="verified" style={{ fontSize: 10 }} /> Expert Verified
+                            </span>
+                        </div>
                         <p className="small mb-0 opacity-75 lh-sm">Soil moisture is critically low at {sm.toFixed(1)}%. Immediate irrigation needed.</p>
+                        <div className="mt-2 text-danger-emphasis fw-bold" style={{ fontSize: 8 }}>
+                            * Disclaimer: Local sensor calibration may vary.
+                        </div>
                     </div>
                 </div>
             )}

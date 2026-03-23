@@ -27,6 +27,11 @@ function ProfileContent() {
     const [usernameState, setUsernameState] = useState('');
     const [phoneNumberState, setPhoneNumberState] = useState('');
     const [aboutState, setAboutState] = useState('');
+    const [skillsState, setSkillsState] = useState('');
+    const [experienceState, setExperienceState] = useState('');
+    const [projectsState, setProjectsState] = useState('');
+    const [achievementsState, setAchievementsState] = useState('');
+    const [portfolioLinkState, setPortfolioLinkState] = useState('');
 
     const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
     const [checkingUsername, setCheckingUsername] = useState(false);
@@ -51,6 +56,11 @@ function ProfileContent() {
             setUsernameState(user.username || '');
             setPhoneNumberState(user.phoneNumber || '');
             setAboutState(user.about || '');
+            setSkillsState(user.skills || '');
+            setExperienceState(user.experience || '');
+            setProjectsState(user.projects || '');
+            setAchievementsState(user.achievements || '');
+            setPortfolioLinkState(user.portfolio_link || '');
             if (user.latitude && user.longitude) {
                 setMapLat(user.latitude);
                 setMapLon(user.longitude);
@@ -113,7 +123,12 @@ function ProfileContent() {
                     farm_name: farmNameState,
                     username: usernameState,
                     phone_number: phoneNumberState,
-                    about: aboutState
+                    about: aboutState,
+                    skills: skillsState,
+                    experience: experienceState,
+                    projects: projectsState,
+                    achievements: achievementsState,
+                    portfolio_link: portfolioLinkState
                 })
             });
 
@@ -365,6 +380,39 @@ function ProfileContent() {
                                     <input className="form-control bg-light border-0 shadow-none py-2 fs-6" type="text" value={farmNameState} onChange={(e) => setFarmNameState(e.target.value)} />
                                 </div>
                             </div>
+                        )}
+
+                        <div className="mb-3">
+                            <label className="small fw-bold text-muted text-uppercase mb-2 d-block">About Me / Bio</label>
+                            <textarea className="form-control bg-light border-0 shadow-none py-2 fs-6" rows={3} value={aboutState} onChange={(e) => setAboutState(e.target.value)} placeholder="Tell us about yourself..." />
+                        </div>
+
+                        {user?.role === 'EXPERT' && (
+                            <>
+                                <div className="mb-3">
+                                    <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Specialized Skills</label>
+                                    <input className="form-control bg-light border-0 shadow-none py-2 fs-6" type="text" value={skillsState} onChange={(e) => setSkillsState(e.target.value)} placeholder="e.g. Pest Control, Soil Health" />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Experience Details</label>
+                                    <textarea className="form-control bg-light border-0 shadow-none py-2 fs-6" rows={2} value={experienceState} onChange={(e) => setExperienceState(e.target.value)} placeholder="Years of experience, fields worked in..." />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Projects</label>
+                                    <textarea className="form-control bg-light border-0 shadow-none py-2 fs-6" rows={3} value={projectsState} onChange={(e) => setProjectsState(e.target.value)} placeholder="List your major agricultural projects..." />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Achievements & Awards</label>
+                                    <textarea className="form-control bg-light border-0 shadow-none py-2 fs-6" rows={3} value={achievementsState} onChange={(e) => setAchievementsState(e.target.value)} placeholder="Certifications, awards, recognitions..." />
+                                </div>
+                                <div className="mb-3">
+                                    <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Portfolio / Professional Link</label>
+                                    <div className="input-group">
+                                        <span className="input-group-text bg-light border-0 text-muted"><Icon name="link" style={{ fontSize: '18px' }} /></span>
+                                        <input className="form-control bg-light border-0 shadow-none py-2 fs-6" type="url" value={portfolioLinkState} onChange={(e) => setPortfolioLinkState(e.target.value)} placeholder="https://linkedin.com/in/..." />
+                                    </div>
+                                </div>
+                            </>
                         )}
 
                         <div className="mb-4">

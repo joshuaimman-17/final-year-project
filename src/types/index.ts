@@ -14,6 +14,11 @@ export interface User {
     location?: string;
     phoneNumber?: string;
     about?: string;
+    skills?: string;
+    experience?: string;
+    projects?: string;
+    achievements?: string;
+    portfolio_link?: string;
     last_login?: string;
     follower_count?: number;
     following_count?: number;
@@ -122,47 +127,4 @@ export interface ReviewCase {
     timestamp: string;
     status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
 }
-export interface MarketListing {
-    id: string;
-    user_id: string;
-    crop_name: string;
-    quantity: number;
-    price: number;
-    location: string;
-    contact?: string;
-    created_at: string | Date;
-}
 
-export interface BuyerRequest {
-    id: string;
-    buyer_name: string;
-    crop_name: string;
-    quantity: number;
-    offered_price?: number;
-    location: string;
-    contact: string;
-    created_at: string | Date;
-}
-
-export interface MandiPrice {
-    id: string;
-    crop: string;
-    market: string;
-    min_price: number;
-    max_price: number;
-    avg_price: number;
-}
-export interface CartItem extends Product {
-    quantity: number;
-}
-
-export interface Order {
-    id: string;
-    items: CartItem[];
-    total: number;
-    status: 'pending' | 'shipped' | 'delivered' | 'cancelled';
-    created_at: string | Date;
-    customer_id: string;
-    customer_name: string;
-    shipping_address?: string;
-}

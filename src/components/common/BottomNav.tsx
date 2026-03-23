@@ -33,21 +33,12 @@ export const BottomNav: React.FC = () => {
     return (
         <nav className="fixed-bottom bg-white border-top pb-safe shadow-lg">
             <div className="d-flex justify-content-around align-items-center" style={{ height: '64px', maxWidth: '448px', margin: '0 auto' }}>
-                {role === 'BUYER' ? (
-                    <>
-                        <NavItem path="/marketplace" icon="storefront" label="Market" />
-                        <NavItem path="/products" icon="inventory_2" label="Products" />
-                        <NavItem path="/cart" icon="shopping_cart" label="Cart" />
-                        <NavItem path="/buyer/orders" icon="receipt_long" label="Orders" />
-                        <NavItem path="/profile" icon="person" label="Profile" />
-                    </>
-                ) : role === 'FARMER' ? (
+                {role === 'FARMER' ? (
                     <>
                         <NavItem path="/" icon="dashboard" label="Home" />
                         <NavItem path="/community" icon="groups" label="Feed" />
                         <NavItem path="/chat" icon="chat" label="Chat" />
                         <NavItem path="/field" icon="landscape" label="Field" />
-                        <NavItem path="/marketplace" icon="storefront" label="Market" />
                         <NavItem path="/profile" icon="person" label="Profile" />
                     </>
                 ) : role === 'EXPERT' ? (
@@ -62,7 +53,6 @@ export const BottomNav: React.FC = () => {
                     <>
                         <NavItem path="/" icon="dashboard" label="Home" />
                         <NavItem path="/community" icon="groups" label="Feed" />
-                        <NavItem path="/marketplace" icon="storefront" label="Market" />
                         <NavItem path="/chat" icon="chat" label="Chat" />
                         <NavItem path="/profile" icon="person" label="Profile" />
                     </>

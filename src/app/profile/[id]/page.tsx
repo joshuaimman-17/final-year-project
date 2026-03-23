@@ -201,6 +201,60 @@ export default function PublicProfilePage() {
                             </div>
                         )}
                         
+                        {profile.about && (
+                            <div className="text-start mb-4 bg-white p-3 rounded-4 border shadow-sm">
+                                <label className="small fw-bold text-muted text-uppercase mb-2 d-block">About</label>
+                                <p className="small mb-0 text-dark" style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{profile.about}</p>
+                            </div>
+                        )}
+
+                        {profile.role === 'EXPERT' && (
+                            <>
+                                {profile.skills && (
+                                    <div className="text-start mb-4 bg-white p-3 rounded-4 border shadow-sm">
+                                        <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Expertise & Skills</label>
+                                        <div className="d-flex flex-wrap gap-2">
+                                            {profile.skills.split(',').map((skill: string, i: number) => (
+                                                <span key={i} className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-2">
+                                                    {skill.trim()}
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {profile.experience && (
+                                    <div className="text-start mb-4 bg-white p-3 rounded-4 border shadow-sm">
+                                        <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Experience</label>
+                                        <p className="small mb-0 text-dark" style={{ lineHeight: '1.6' }}>{profile.experience}</p>
+                                    </div>
+                                )}
+
+                                {profile.projects && (
+                                    <div className="text-start mb-4 bg-white p-3 rounded-4 border shadow-sm">
+                                        <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Projects</label>
+                                        <p className="small mb-0 text-dark" style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{profile.projects}</p>
+                                    </div>
+                                )}
+
+                                {profile.achievements && (
+                                    <div className="text-start mb-4 bg-white p-3 rounded-4 border shadow-sm">
+                                        <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Achievements</label>
+                                        <p className="small mb-0 text-dark" style={{ lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>{profile.achievements}</p>
+                                    </div>
+                                )}
+
+                                {profile.portfolio_link && (
+                                    <div className="text-start mb-4 bg-white p-3 rounded-4 border shadow-sm">
+                                        <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Professional Portfolio</label>
+                                        <a href={profile.portfolio_link} target="_blank" rel="noopener noreferrer" className="btn btn-outline-success btn-sm w-100 rounded-pill d-flex align-items-center justify-content-center gap-2">
+                                            <span className="material-symbols-outlined fs-6">link</span> View Portfolio
+                                        </a>
+                                    </div>
+                                )}
+                            </>
+                        )}
+                        
                         {profile.location && (
                             <div className="text-start mb-4 bg-light p-3 rounded-4 border">
                                 <label className="small fw-bold text-muted text-uppercase mb-2 d-block">Location</label>

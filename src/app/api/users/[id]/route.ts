@@ -42,7 +42,8 @@ export async function GET(
         // Primary User Fetch
         // We use ::text to ensure PostgreSQL treats the Firebase UID correctly as a string.
         const userResult = await neonSql`
-            SELECT id, username, full_name, role, created_at, location, latitude, longitude, avatar_url, farm_name
+            SELECT id, username, full_name, role, created_at, location, latitude, longitude, avatar_url, farm_name, follower_count, following_count,
+                   about, skills, experience, projects, achievements, portfolio_link, expert_status
             FROM users 
             WHERE id = ${id}::text
             LIMIT 1
@@ -55,27 +56,8 @@ export async function GET(
 
         const user = userResult[0];
 
-        // Resilient Follow Counts
-        let follower_count = 0;
-        let following_count = 0;
-
-        try {
-            // BigInt casting logic (Number() ensures JSON safety)
-            const followerRes = await neonSql`SELECT COUNT(*) as count FROM follows WHERE followee_id = ${id}::text`;
-            follower_count = Number(followerRes[0]?.count || 0);
-
-            const followingRes = await neonSql`SELECT COUNT(*) as count FROM follows WHERE follower_id = ${id}::text`;
-            following_count = Number(followingRes[0]?.count || 0);
-        } catch (dbErr: any) {
-            console.warn(`[API][${requestId}] Follow counts fetch issue (expected if table missing):`, dbErr.message);
-        }
-
         console.log(`[API][${requestId}] Profile success: "${id}"`);
-        return NextResponse.json({
-            ...user,
-            follower_count,
-            following_count
-        });
+        return NextResponse.json(user);
 
     } catch (criticalError: any) {
         console.error(`[API][${requestId}] Internal Server Error:`, criticalError);

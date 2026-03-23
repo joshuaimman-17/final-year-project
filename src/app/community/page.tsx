@@ -72,22 +72,8 @@ function CommunityContent() {
                     </button>
                 </div>
 
-                <div className="d-flex align-items-center justify-content-between mb-3 px-1">
-                    <div className="d-flex gap-2 bg-white rounded-pill p-1 shadow-sm border">
-                        <button 
-                            onClick={() => setFilter('all')} 
-                            className={`btn btn-sm rounded-pill px-3 fw-bold ${filter === 'all' ? 'btn-success' : 'btn-light border-0 text-muted'}`}
-                        >
-                            Explore
-                        </button>
-                        <button 
-                            onClick={() => setFilter('following')} 
-                            className={`btn btn-sm rounded-pill px-3 fw-bold ${filter === 'following' ? 'btn-success' : 'btn-light border-0 text-muted'}`}
-                        >
-                            Following
-                        </button>
-                    </div>
-                    <Icon name="tune" className="text-muted small pe-auto" style={{ cursor: 'pointer' }}/>
+                <div className="mb-3 px-1">
+                    <h3 className="h6 fw-bold text-dark mb-0">Explore Updates</h3>
                 </div>
 
                 {/* Feed */}

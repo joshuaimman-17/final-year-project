@@ -17,7 +17,6 @@ const COUNTRY_CODES = [
 ];
 
 const ROLE_OPTIONS = [
-    { id: 'BUYER', title: 'Buyer (Customer)', icon: 'person', desc: 'Browse and buy fresh produce' },
     { id: 'FARMER', title: 'Farmer', icon: 'agriculture', desc: 'Sell your crops and manage orders' },
     { id: 'EXPERT', title: 'Expert', icon: 'psychology', desc: 'Provide agricultural guidance' },
 ];
@@ -32,7 +31,7 @@ export default function SignupPage() {
     const [phoneNumber, setPhoneNumber] = useState('');
     const [countryCode, setCountryCode] = useState('+91');
     const [username, setUsername] = useState('');
-    const [role, setRole] = useState('BUYER');
+    const [role, setRole] = useState('FARMER');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
@@ -50,7 +49,6 @@ export default function SignupPage() {
             case 'ADMIN': router.replace('/admin/dashboard'); break;
             case 'FARMER': router.replace('/farmer/dashboard'); break;
             case 'EXPERT': router.replace('/expert/dashboard'); break;
-            case 'BUYER': router.replace('/marketplace'); break;
             default: router.replace('/');
         }
     }, [user, router]);

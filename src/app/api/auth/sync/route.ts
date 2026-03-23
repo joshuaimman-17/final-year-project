@@ -29,6 +29,12 @@ export async function POST(req: NextRequest) {
         
         // Extract extra fields from body
         const farmName = body.farm_name || body.farmName || null;
+        const about = body.about || null;
+        const skills = body.skills || null;
+        const experience = body.experience || null;
+        const projects = body.projects || null;
+        const achievements = body.achievements || null;
+        const portfolioLink = body.portfolio_link || body.portfolioLink || null;
         const lat = body.latitude || 20.5937;
         const lon = body.longitude || 78.9629;
 
@@ -55,8 +61,8 @@ export async function POST(req: NextRequest) {
             const preservedRole = isAdminEmail
                 ? 'ADMIN'
                 : user.role === 'ADMIN'
-                    ? 'BUYER'  // non-admin-email users cannot keep ADMIN role
-                    : (user.role || 'BUYER');
+                    ? 'FARMER'  // non-admin-email users cannot keep ADMIN role
+                    : (user.role || 'FARMER');
 
             const updatedUsers = await neonSql`
                 UPDATE users 
@@ -65,6 +71,12 @@ export async function POST(req: NextRequest) {
                     avatar_url = ${picture || user.avatar_url || ''},
                     role = ${preservedRole},
                     farm_name = ${farmName || user.farm_name || null},
+                    about = ${about || user.about || null},
+                    skills = ${skills || user.skills || null},
+                    experience = ${experience || user.experience || null},
+                    projects = ${projects || user.projects || null},
+                    achievements = ${achievements || user.achievements || null},
+                    portfolio_link = ${portfolioLink || user.portfolio_link || null},
                     latitude = ${lat},
                     longitude = ${lon}
                 WHERE id = ${userId}
@@ -73,16 +85,16 @@ export async function POST(req: NextRequest) {
             finalUser = updatedUsers[0];
         } else {
             console.log(`[Sync] Creating new user: ${email || userId}`);
-            let defaultRole = body.role?.toUpperCase() || 'BUYER';
+            let defaultRole = body.role?.toUpperCase() || 'FARMER';
             if (defaultRole === 'ADMIN' && !isAdminEmail) {
-                defaultRole = 'BUYER';
+                defaultRole = 'FARMER';
             }
             if (isAdminEmail) defaultRole = 'ADMIN';
 
             const defaultUsername = body.username || email?.split('@')[0] || `user_${userId.slice(-5)}`;
             
             const newUsers = await neonSql`
-                INSERT INTO users (id, email, username, full_name, avatar_url, role, farm_name, latitude, longitude)
+                INSERT INTO users (id, email, username, full_name, avatar_url, role, farm_name, about, skills, experience, projects, achievements, portfolio_link, latitude, longitude)
                 VALUES (
                     ${userId}, 
                     ${email || null}, 
@@ -91,6 +103,12 @@ export async function POST(req: NextRequest) {
                     ${picture || ''}, 
                     ${defaultRole},
                     ${farmName},
+                    ${about},
+                    ${skills},
+                    ${experience},
+                    ${projects},
+                    ${achievements},
+                    ${portfolioLink},
                     ${lat},
                     ${lon}
                 )
@@ -99,30 +117,22 @@ export async function POST(req: NextRequest) {
             finalUser = newUsers[0];
         }
 
-        // Fetch follow counts
-        let follower_count = 0;
-        let following_count = 0;
-        try {
-            // Note: We avoid creating tables inside the GET/POST handlers for performance and safety.
-            // If the table is missing, the catch block handles it by defaulting to 0.
-            const followerRes = await neonSql`SELECT COUNT(*) as count FROM follows WHERE followee_id = ${userId}`;
-            follower_count = Number(followerRes[0]?.count || 0);
-
-            const followingRes = await neonSql`SELECT COUNT(*) as count FROM follows WHERE follower_id = ${userId}`;
-            following_count = Number(followingRes[0]?.count || 0);
-        } catch (e) {
-            console.warn('[Sync] Follow counts fetch failed (possibly table missing):', e);
-        }
-
         // Return standardized user object for frontend
         return NextResponse.json({ 
             user: {
                 ...finalUser,
-                follower_count,
-                following_count,
                 // Ensure frontend gets 'id' and 'full_name' as expected by types
                 id: finalUser.id,
-                full_name: finalUser.full_name
+                full_name: finalUser.full_name,
+                about: finalUser.about,
+                skills: finalUser.skills,
+                experience: finalUser.experience,
+                projects: finalUser.projects,
+                achievements: finalUser.achievements,
+                portfolio_link: finalUser.portfolio_link,
+                expert_status: finalUser.expert_status || 'none',
+                follower_count: finalUser.follower_count || 0,
+                following_count: finalUser.following_count || 0
             }, 
             message: 'Sync successful' 
         });

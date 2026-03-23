@@ -15,7 +15,11 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 
-    const users = await neonSql`SELECT id, email, username, full_name, role, expert_status, created_at FROM users ORDER BY created_at DESC`;
+    // Ensure status column exists before querying
+    await neonSql`ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'active'`;
+    
+    // Include status in the result
+    const users = await neonSql`SELECT id, email, username, full_name, role, expert_status, status, created_at FROM users ORDER BY created_at DESC`;
     return NextResponse.json({ users });
 }
 

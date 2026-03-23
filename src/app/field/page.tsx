@@ -17,6 +17,9 @@ import { AIDiagnosis } from '@/features/field/components/AIDiagnosis';
 import { TimelineHistory } from '@/features/field/components/TimelineHistory';
 import { FieldSetupForm, FieldConfig } from '@/features/field/components/FieldSetupForm';
 import { FieldSummaryCard } from '@/features/field/components/FieldSummaryCard';
+import { CropLifecycleCalendar } from '@/features/field/components/CropLifecycleCalendar';
+import { SoilHealthWallet } from '@/features/field/components/SoilHealthWallet';
+import { OutbreakHeatmap } from '@/features/field/components/OutbreakHeatmap';
 
 // Lazy load the heavy chart component
 const TrendChart = dynamic(() => import('@/features/field/components/TrendChart'), {
@@ -114,24 +117,69 @@ function FieldContent() {
         }
     };
 
-    const handleSaveConfig = (newConfigs: FieldConfig[]) => {
+    const fetchFieldFromBackend = useCallback(async () => {
+        if (!user) return;
+        try {
+            const { auth } = await import('@/lib/firebase');
+            const token = await auth.currentUser?.getIdToken();
+            if (!token) return;
+
+            const res = await fetch('/api/field', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data.configs && data.configs.length > 0) {
+                    setConfig(data.field || data.configs[0]);
+                    setConfigs(data.configs);
+                    localStorage.setItem('drplant_field_config', JSON.stringify(data.field || data.configs[0]));
+                    localStorage.setItem('drplant_field_configs_all', JSON.stringify(data.configs));
+                }
+            }
+        } catch (err) {
+            console.error("Fetch Backend Config Error", err);
+        }
+    }, [user]);
+
+    const handleSaveConfig = async (newConfigs: FieldConfig[]) => {
         if (!newConfigs || newConfigs.length === 0) return;
         
-        // Default to showing the first profile to maintain existing chart integrations
         const primaryConfig = newConfigs[0];
+        
+        // Save to LocalStorage first for instant feedback
         setConfig(primaryConfig);
         setConfigs(newConfigs);
-        
-        // Save both primary and raw array
         localStorage.setItem('drplant_field_config', JSON.stringify(primaryConfig));
         localStorage.setItem('drplant_field_configs_all', JSON.stringify(newConfigs));
         setShowSetup(false);
+
+        // Save to Backend
+        try {
+            const { auth } = await import('@/lib/firebase');
+            const token = await auth.currentUser?.getIdToken();
+            
+            await fetch('/api/field', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    configs: newConfigs,
+                    latitude: user?.latitude,
+                    longitude: user?.longitude
+                })
+            });
+        } catch (err) {
+            console.error("Save Backend Config Error", err);
+        }
     };
 
     // Location & Sync Intv
     useEffect(() => {
         if (!user) return;
         detectLocation();
+        fetchFieldFromBackend();
         
         const intv = setInterval(() => {
             setLastSynced((prev) => {
@@ -274,28 +322,46 @@ function FieldContent() {
                 
                 <FieldSummaryCard config={config} onEdit={() => setShowSetup(true)} />
 
-                {config.sensorsAvailable === 'Yes' ? (
-                    <>
-                        <AlertsPanel sm={sm} loading={loading} />
-                        <SensorCards loading={loading} sm={sm} temp={temp} n={n} ph={ph} smColor={statusTheme.color} />
-                    </>
-                ) : (
-                    <div className="card border border-secondary border-opacity-25 shadow-sm rounded-4 p-4 text-center mb-4 bg-white bg-opacity-75">
-                        <Icon name="sensors_off" className="text-muted mb-2 opacity-50 display-4" />
-                        <h4 className="h6 fw-bold text-dark mb-1">No Sensors Connected</h4>
-                        <p className="small text-muted mb-0">Hardware telemetry is disabled in your Profile Budget settings. Switch to 'Yes' to enable live moisture readouts.</p>
-                    </div>
-                )}
+                {/* ── 1. Field Operations ── */}
+                <div className="mb-4">
+                    <h3 className="h6 fw-bold text-dark text-uppercase mb-3" style={{ fontSize: 11, letterSpacing: '1px' }}>Field Operations</h3>
+                    {config.sensorsAvailable === 'Yes' ? (
+                        <>
+                            <AlertsPanel sm={sm} loading={loading} />
+                            <SensorCards loading={loading} sm={sm} temp={temp} n={n} ph={ph} smColor={statusTheme.color} />
+                        </>
+                    ) : (
+                        <div className="card border border-secondary border-opacity-25 shadow-sm rounded-4 p-4 text-center mb-4 bg-white bg-opacity-75">
+                            <Icon name="sensors_off" className="text-muted mb-2 opacity-50 display-4" />
+                            <h4 className="h6 fw-bold text-dark mb-1">No Sensors Connected</h4>
+                            <p className="small text-muted mb-0">Hardware telemetry is disabled in your Profile Budget settings. Switch to 'Yes' to enable live moisture readouts.</p>
+                        </div>
+                    )}
+                    <RecommendationEngine config={config} sm={config.sensorsAvailable === 'Yes' ? sm : 45} />
+                </div>
 
-                <RecommendationEngine config={config} sm={config.sensorsAvailable === 'Yes' ? sm : 45} />
+                {/* ── 2. Smart Insights ── */}
+                <div>
+                    <h3 className="h6 fw-bold text-dark text-uppercase mb-3" style={{ fontSize: 11, letterSpacing: '1px' }}>Smart Insights</h3>
+                    
+                    {config.sensorsAvailable === 'Yes' && (
+                        <TrendChart data={mockChartData} />
+                    )}
 
-                {config.sensorsAvailable === 'Yes' && (
-                    <TrendChart data={mockChartData} />
-                )}
+                    <AIDiagnosis data={diagnosis} loading={scanning} />
 
-                <AIDiagnosis data={diagnosis} loading={scanning} />
+                    {config && (
+                        <CropLifecycleCalendar config={config} />
+                    )}
 
-                <TimelineHistory config={config} />
+                    {user?.latitude && user?.longitude && (
+                        <OutbreakHeatmap lat={user.latitude} lon={user.longitude} />
+                    )}
+
+                    <SoilHealthWallet />
+
+                    <TimelineHistory config={config} />
+                </div>
 
             </main>
 

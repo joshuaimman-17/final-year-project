@@ -12,32 +12,20 @@ interface UserRow {
     full_name: string;
     role: string;
     expert_status?: string;
-    created_at: string;
-}
-interface ExpertRequest {
-    id: string;
-    user_id: string;
-    full_name: string;
-    email: string;
-    username: string;
-    skills: string;
-    experience: string;
-    portfolio_link?: string;
-    message?: string;
-    status: string;
+    status?: string;
     created_at: string;
 }
 
-type Tab = 'dashboard' | 'users' | 'expert-requests' | 'community';
+type Tab = 'dashboard' | 'users' | 'community';
 
 // ─── Admin Dashboard ──────────────────────────────────────────────────────────
 export default function AdminDashboard() {
     const { user, logout } = useAuth();
     const router = useRouter();
     const [tab, setTab] = useState<Tab>('dashboard');
-    const [userSubTab, setUserSubTab] = useState<'ALL' | 'BUYER' | 'FARMER' | 'EXPERT' | 'ADMIN'>('ALL');
+    const [userSubTab, setUserSubTab] = useState<'ALL' | 'FARMER' | 'EXPERT' | 'ADMIN'>('ALL');
     const [users, setUsers] = useState<UserRow[]>([]);
-    const [expertRequests, setExpertRequests] = useState<ExpertRequest[]>([]);
+
     const [adminPosts, setAdminPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [msg, setMsg] = useState('');
@@ -79,20 +67,6 @@ export default function AdminDashboard() {
         }
     }, [getToken]);
 
-    const fetchExpertRequests = useCallback(async () => {
-        setLoading(true);
-        try {
-            const token = await getToken();
-            const res = await fetch('/api/admin/expert-requests', { headers: { Authorization: `Bearer ${token}` } });
-            if (!res.ok) throw new Error('Failed to fetch expert requests');
-            const data = await res.json();
-            setExpertRequests(data.requests || []);
-        } catch (err: any) {
-            setMsg(`Error: ${err.message}`);
-        } finally {
-            setLoading(false);
-        }
-    }, [getToken]);
 
     const fetchAdminPosts = useCallback(async () => {
         setLoading(true);
@@ -111,9 +85,8 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         if (tab === 'dashboard' || tab === 'users') fetchUsers();
-        if (tab === 'expert-requests') fetchExpertRequests();
         if (tab === 'community') fetchAdminPosts();
-    }, [tab, fetchUsers, fetchExpertRequests, fetchAdminPosts]);
+    }, [tab, fetchUsers, fetchAdminPosts]);
 
     const handleRoleChange = async (userId: string, newRole: string) => {
         // Optimistic update
@@ -160,23 +133,25 @@ export default function AdminDashboard() {
             setMsg(`Error: ${err.message}`);
         }
     };
-
-    const handleExpertRequest = async (requestId: string, status: 'approved' | 'denied') => {
-        const token = await getToken();
-        const res = await fetch('/api/admin/expert-requests', {
-            method: 'PATCH',
-            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requestId, status })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            setMsg(`User successfully promoted to Expert.`);
-            fetchExpertRequests();
-            fetchUsers(); // Refresh users list too since role changed
-        } else {
-            console.error("Expert request failed:", data.message);
+    const handleBlockUser = async (userId: string, currentStatus: string) => {
+        const action = currentStatus === 'blocked' ? 'unblock' : 'block';
+        if (!confirm(`Are you sure you want to ${action} this user?`)) return;
+        try {
+            const token = await getToken();
+            const res = await fetch('/api/admin/users/block', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, action })
+            });
+            if (!res.ok) throw new Error(`Failed to ${action} user`);
+            setMsg(`User ${action}ed successfully`);
+            fetchUsers();
+        } catch (err: any) {
+            setMsg(`Error: ${err.message}`);
         }
     };
+
+
 
     const handleDeletePost = async (postId: string) => {
         if (!confirm('Are you sure you want to delete this post?')) return;
@@ -258,7 +233,7 @@ export default function AdminDashboard() {
                 {/* Main Tabs */}
                 <div className="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 p-1 bg-white">
                     <div className="nav nav-pills nav-fill">
-                        {(['dashboard', 'users', 'expert-requests', 'community'] as const).map((key) => (
+                        {(['dashboard', 'users', 'community'] as const).map((key) => (
                             <button
                                 key={key}
                                 className={`nav-link py-3 fw-bold rounded-3 transition-all ${tab === key ? 'bg-success text-white shadow-sm' : 'text-muted'}`}
@@ -266,9 +241,9 @@ export default function AdminDashboard() {
                             >
                                 <div className="d-flex align-items-center justify-content-center gap-2">
                                     <span className="material-symbols-outlined fs-5">
-                                        {key === 'dashboard' ? 'dashboard' : key === 'users' ? 'group' : key === 'community' ? 'forum' : 'verified_user'}
+                                        {key === 'dashboard' ? 'dashboard' : key === 'users' ? 'group' : 'forum'}
                                     </span>
-                                    <span className="d-none d-md-block text-capitalize">{key.replace('-', ' ')}</span>
+                                    <span className="d-none d-md-block text-capitalize">{key}</span>
                                 </div>
                             </button>
                         ))}
@@ -281,7 +256,6 @@ export default function AdminDashboard() {
                         <div className="row g-4">
                             {[
                                 { label: 'Total Users', val: users.length, icon: 'group', color: 'primary', action: () => { setTab('users'); } },
-                                { label: 'Buyers', val: users.filter(u => u.role === 'BUYER').length, icon: 'shopping_cart', color: 'success', action: () => { setTab('users'); } },
                                 { label: 'Farmers', val: users.filter(u => u.role === 'FARMER').length, icon: 'agriculture', color: 'warning', action: () => { setTab('users'); } },
                                 { label: 'Experts', val: users.filter(u => u.role === 'EXPERT').length, icon: 'psychology', color: 'info', action: () => { setTab('users'); } },
                                 { label: 'Admins', val: users.filter(u => u.role === 'ADMIN').length, icon: 'admin_panel_settings', color: 'danger', action: () => { setTab('users'); } },
@@ -335,7 +309,7 @@ export default function AdminDashboard() {
                                 </div>
                                 <div className="d-flex align-items-center gap-2">
                                     <div className="btn-group bg-light p-1 rounded-pill flex-wrap">
-                                        {(['ALL', 'BUYER', 'FARMER', 'EXPERT', 'ADMIN'] as const).map(roleKey => (
+                                        {(['ALL', 'FARMER', 'EXPERT', 'ADMIN'] as const).map(roleKey => (
                                             <button 
                                                 key={roleKey}
                                                 onClick={() => setUserSubTab(roleKey)}
@@ -383,8 +357,8 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td>
                                                     <div className="d-flex align-items-center gap-2">
-                                                        <span className="rounded-circle bg-success d-block" style={{ width: '8px', height: '8px' }}></span>
-                                                        <span className="small text-muted fw-bold">Active</span>
+                                                        <span className={`rounded-circle ${u.status === 'blocked' ? 'bg-danger' : 'bg-success'} d-block`} style={{ width: '8px', height: '8px' }}></span>
+                                                        <span className="small text-muted fw-bold">{u.status === 'blocked' ? 'Blocked' : 'Active'}</span>
                                                     </div>
                                                 </td>
                                                 <td className="px-4 text-end">
@@ -401,7 +375,10 @@ export default function AdminDashboard() {
                                                                 <option value="EXPERT">Expert</option>
                                                                 <option value="ADMIN">Admin</option>
                                                             </select>
-                                                            <button onClick={() => handleDeleteUser(u.id)} className="btn btn-light btn-sm rounded-circle p-2 text-danger border shadow-none">
+                                                            <button onClick={() => handleBlockUser(u.id, u.status || 'active')} className="btn btn-light btn-sm rounded-circle p-2 text-warning border shadow-none me-1" title={u.status === 'blocked' ? "Unblock User" : "Block User"}>
+                                                                <span className="material-symbols-outlined fs-5">{u.status === 'blocked' ? 'lock_open' : 'block'}</span>
+                                                            </button>
+                                                            <button onClick={() => handleDeleteUser(u.id)} className="btn btn-light btn-sm rounded-circle p-2 text-danger border shadow-none" title="Delete User">
                                                                 <span className="material-symbols-outlined fs-5">delete</span>
                                                             </button>
                                                         </div>
@@ -414,84 +391,6 @@ export default function AdminDashboard() {
                                     </tbody>
                                 </table>
                             </div>
-                        </div>
-                    )}
-
-                    {tab === 'expert-requests' && (
-                        <div className="row g-4">
-                            {expertRequests.length === 0 ? (
-                                <div className="col-12 text-center py-5">
-                                    <div className="bg-white rounded-4 shadow-sm p-5">
-                                        <span className="material-symbols-outlined display-1 text-muted mb-3">cloud_done</span>
-                                        <h3 className="h5 fw-bold">All caught up!</h3>
-                                        <p className="text-muted mb-0">There are no pending expert applications at the moment.</p>
-                                    </div>
-                                </div>
-                            ) : (
-                                expertRequests.map((r) => (
-                                    <div key={r.id} className="col-12 col-lg-6">
-                                        <div className="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
-                                            <div className="card-header bg-white border-bottom p-4 d-flex align-items-center justify-content-between">
-                                                <div className="d-flex align-items-center gap-3">
-                                                    <div className="bg-warning-subtle text-warning rounded-pill p-2 d-flex">
-                                                        <span className="material-symbols-outlined">badge</span>
-                                                    </div>
-                                                    <div>
-                                                        <h4 className="h6 fw-bold mb-0">{r.full_name}</h4>
-                                                        <p className="text-muted small mb-0">@{r.username || 'user'}</p>
-                                                    </div>
-                                                </div>
-                                                <span className={`badge rounded-pill fw-bold ${badgeColor[r.status]}`} style={{ fontSize: '10px' }}>
-                                                    {r.status.toUpperCase()}
-                                                </span>
-                                            </div>
-                                            <div className="card-body p-4 bg-light-subtle">
-                                                <div className="mb-4">
-                                                    <label className="text-muted small text-uppercase fw-bold mb-2 d-block">Skills & Expertise</label>
-                                                    <p className="mb-0 fw-semibold text-dark p-3 bg-white rounded-3 border">{r.skills}</p>
-                                                </div>
-                                                <div className="mb-4">
-                                                    <label className="text-muted small text-uppercase fw-bold mb-2 d-block">Background / Experience</label>
-                                                    <p className="mb-0 small text-muted p-3 bg-white rounded-3 border">{r.experience}</p>
-                                                </div>
-                                                {r.portfolio_link && (
-                                                    <div className="mb-4">
-                                                        <label className="text-muted small text-uppercase fw-bold mb-2 d-block">Portfolio Link</label>
-                                                        <a href={r.portfolio_link} target="_blank" rel="noreferrer" className="text-success small fw-bold d-flex align-items-center gap-1 text-decoration-none">
-                                                            <span className="material-symbols-outlined fs-6">link</span>
-                                                            {r.portfolio_link}
-                                                        </a>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {r.status === 'pending' && (
-                                                <div className="card-footer bg-white border-0 p-4 pt-0">
-                                                    <div className="row g-2">
-                                                        <div className="col-6">
-                                                            <button 
-                                                                onClick={() => handleExpertRequest(r.id, 'approved')} 
-                                                                className="btn btn-success w-100 py-3 rounded-4 fw-bold shadow-sm d-flex align-items-center justify-content-center gap-2"
-                                                            >
-                                                                <span className="material-symbols-outlined">verified</span>
-                                                                Approve
-                                                            </button>
-                                                        </div>
-                                                        <div className="col-6">
-                                                            <button 
-                                                                onClick={() => handleExpertRequest(r.id, 'denied')} 
-                                                                className="btn btn-outline-danger w-100 py-3 rounded-4 fw-bold border-0"
-                                                            >
-                                                                <span className="material-symbols-outlined">block</span>
-                                                                Deny
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
                         </div>
                     )}
                     {tab === 'community' && (
