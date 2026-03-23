@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import neonSql from '@/lib/neon';
 import { verifyAuth } from '@/lib/authHelper';
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const decoded = await verifyAuth(req);
         if (!decoded) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
@@ -14,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         const updatedOrders = await neonSql`
             UPDATE orders 
             SET status = ${status}, updated_at = NOW()
-            WHERE id = ${params.id} AND (farmer_id = ${decoded.uid} OR buyer_id = ${decoded.uid})
+            WHERE id = ${id} AND (farmer_id = ${decoded.uid} OR buyer_id = ${decoded.uid})
             RETURNING *
         `;
 
