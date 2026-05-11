@@ -5,9 +5,12 @@ services:
     rootDir: backend/service-users
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api.index:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+      - key: FRONTEND_URL
+        value: https://frontend-kappa-steel-ermse818vz.vercel.app
 
   - type: web
     name: service-gateway
@@ -15,9 +18,35 @@ services:
     rootDir: backend/service-gateway
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api.index:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+      - key: SERVICE_USERS_URL
+        fromService:
+          name: service-users
+          type: web
+          property: host
+      - key: SERVICE_FARMS_URL
+        fromService:
+          name: service-farms
+          type: web
+          property: host
+      - key: SERVICE_MARKETPLACE_URL
+        fromService:
+          name: service-marketplace
+          type: web
+          property: host
+      - key: SERVICE_COMMUNITY_URL
+        fromService:
+          name: service-community
+          type: web
+          property: host
+      - key: SERVICE_CHAT_URL
+        fromService:
+          name: service-chat
+          type: web
+          property: host
 
   - type: web
     name: service-farms
@@ -25,6 +54,7 @@ services:
     rootDir: backend/service-farms
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api.index:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
@@ -35,6 +65,7 @@ services:
     rootDir: backend/service-marketplace
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api.index:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
@@ -45,6 +76,7 @@ services:
     rootDir: backend/service-community
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api.index:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
@@ -55,6 +87,15 @@ services:
     rootDir: backend/service-chat
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn api.index:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+
+envVars:
+  - key: DATABASE_URL
+    sync: false
+  - key: FIREBASE_API_KEY
+    sync: false
+  - key: FIREBASE_SERVICE_ACCOUNT_JSON_CONTENT
+    sync: false
