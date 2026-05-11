@@ -4,3 +4,4 @@ asyncpg
 firebase-admin
 httpx
 uvicorn
+python-dotenv

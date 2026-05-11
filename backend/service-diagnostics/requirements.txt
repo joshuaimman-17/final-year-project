@@ -7,3 +7,4 @@ ultralytics
 numpy
 opencv-python-headless
 uvicorn
+python-dotenv

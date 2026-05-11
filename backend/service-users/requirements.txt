@@ -6,3 +6,4 @@ httpx
 pydantic[email]
 uvicorn
 aiosmtplib
+python-dotenv

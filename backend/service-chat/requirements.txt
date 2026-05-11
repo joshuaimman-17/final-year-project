@@ -3,3 +3,4 @@ firebase-admin
 pusher
 httpx
 uvicorn
+python-dotenv
