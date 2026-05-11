@@ -7,3 +7,5 @@ pydantic[email]
 uvicorn
 aiosmtplib
 python-dotenv
+sqlalchemy
+asyncpg

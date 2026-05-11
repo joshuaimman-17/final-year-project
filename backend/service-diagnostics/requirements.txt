@@ -8,3 +8,5 @@ numpy
 opencv-python-headless
 uvicorn
 python-dotenv
+sqlalchemy
+asyncpg

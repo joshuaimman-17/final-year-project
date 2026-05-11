@@ -4,3 +4,5 @@ pusher
 httpx
 uvicorn
 python-dotenv
+sqlalchemy
+asyncpg

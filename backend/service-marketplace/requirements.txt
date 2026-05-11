@@ -5,3 +5,5 @@ firebase-admin
 httpx
 uvicorn
 python-dotenv
+sqlalchemy
+asyncpg
