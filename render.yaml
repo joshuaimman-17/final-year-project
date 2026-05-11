@@ -7,6 +7,7 @@ envVarGroups:
         sync: false
       - key: FIREBASE_SERVICE_ACCOUNT_JSON_CONTENT
         sync: false
+
 services:
   - type: web
     name: service-users
@@ -21,6 +22,8 @@ services:
         value: 3.12.0
       - key: FRONTEND_URL
         value: https://frontend-kappa-steel-ermse818vz.vercel.app
+    fromGroup:
+      name: project-secrets
 
   - type: web
     name: service-gateway
@@ -58,6 +61,13 @@ services:
           name: service-chat
           type: web
           property: host
+      - key: SERVICE_DIAGNOSTICS_URL
+        fromService:
+          name: service-diagnostics
+          type: web
+          property: host
+    fromGroup:
+      name: project-secrets
 
   - type: web
     name: service-farms
@@ -70,6 +80,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+    fromGroup:
+      name: project-secrets
 
   - type: web
     name: service-marketplace
@@ -82,6 +94,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+    fromGroup:
+      name: project-secrets
 
   - type: web
     name: service-community
@@ -94,6 +108,8 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+    fromGroup:
+      name: project-secrets
 
   - type: web
     name: service-chat
@@ -106,5 +122,19 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.0
+    fromGroup:
+      name: project-secrets
 
-
+  - type: web
+    name: service-diagnostics
+    env: python
+    plan: free
+    rootDir: backend/service-diagnostics
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api.index:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.0
+    fromGroup:
+      name: project-secrets
