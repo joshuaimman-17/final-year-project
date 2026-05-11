@@ -101,10 +101,4 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.0
 
-envVars:
-  - key: DATABASE_URL
-    sync: false
-  - key: FIREBASE_API_KEY
-    sync: false
-  - key: FIREBASE_SERVICE_ACCOUNT_JSON_CONTENT
-    sync: false
+
