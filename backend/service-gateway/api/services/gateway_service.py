@@ -4,12 +4,16 @@ from fastapi import Request, Response
 
 SERVICES = {
     "users": os.getenv("SERVICE_USERS_URL", "http://127.0.0.1:8002"),
+    "user": os.getenv("SERVICE_USERS_URL", "http://127.0.0.1:8002"),
     "farms": os.getenv("SERVICE_FARMS_URL", "http://127.0.0.1:8003"),
+    "farm": os.getenv("SERVICE_FARMS_URL", "http://127.0.0.1:8003"),
     "diagnostics": os.getenv("SERVICE_DIAGNOSTICS_URL", "http://127.0.0.1:8004"),
+    "diagnostic": os.getenv("SERVICE_DIAGNOSTICS_URL", "http://127.0.0.1:8004"),
     "marketplace": os.getenv("SERVICE_MARKETPLACE_URL", "http://127.0.0.1:8005"),
     "community": os.getenv("SERVICE_COMMUNITY_URL", "http://127.0.0.1:8006"),
     "chat": os.getenv("SERVICE_CHAT_URL", "http://127.0.0.1:8007"),
 }
+
 
 class GatewayService:
     @staticmethod
