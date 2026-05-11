@@ -36,35 +36,17 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.0
       - key: SERVICE_USERS_URL
-        fromService:
-          name: service-users
-          type: web
-          property: host
+        value: http://service-users:10000
       - key: SERVICE_FARMS_URL
-        fromService:
-          name: service-farms
-          type: web
-          property: host
+        value: http://service-farms:10000
       - key: SERVICE_MARKETPLACE_URL
-        fromService:
-          name: service-marketplace
-          type: web
-          property: host
+        value: http://service-marketplace:10000
       - key: SERVICE_COMMUNITY_URL
-        fromService:
-          name: service-community
-          type: web
-          property: host
+        value: http://service-community:10000
       - key: SERVICE_CHAT_URL
-        fromService:
-          name: service-chat
-          type: web
-          property: host
+        value: http://service-chat:10000
       - key: SERVICE_DIAGNOSTICS_URL
-        fromService:
-          name: service-diagnostics
-          type: web
-          property: host
+        value: http://service-diagnostics:10000
       - fromGroup: project-secrets
 
   - type: web
