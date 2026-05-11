@@ -1,0 +1,60 @@
+Dr.Plant Backend Endpoint Audit Report
+======================================
+
+Date: 2026-04-24
+
+Service                   | Endpoint                  | Status     | Result    
+--------------------------------------------------------------------------------
+Gateway                   | /health                   | 200        | PASS      
+Users Service             | /health                   | 200        | PASS      
+Farms Service             | /health                   | 200        | PASS      
+Diagnostics Service       | /health                   | 200        | PASS      
+Marketplace Service       | /health                   | 200        | PASS      
+Community Service         | /health                   | 200        | PASS      
+Chat Service              | /health                   | 200        | PASS      
+Users Service             | /api/users/me             | 401        | PASS      
+Farms Service             | /api/farms                | 401        | PASS      
+Marketplace Service       | /api/marketplace/listings | 500        | FAIL      
+
+Detailed Logs:
+--------------------------------------------------------------------------------
+[Gateway] /health
+Status: 200
+Response: {"status":"healthy","service":"gateway"}
+
+[Users Service] /health
+Status: 200
+Response: {"status":"healthy","service":"users"}
+
+[Farms Service] /health
+Status: 200
+Response: {"status":"healthy","service":"farms"}
+
+[Diagnostics Service] /health
+Status: 200
+Response: {"status":"healthy","service":"diagnostics"}
+
+[Marketplace Service] /health
+Status: 200
+Response: {"status":"healthy","service":"marketplace"}
+
+[Community Service] /health
+Status: 200
+Response: {"status":"healthy","service":"community"}
+
+[Chat Service] /health
+Status: 200
+Response: {"status":"healthy","service":"chat"}
+
+[Users Service] /api/users/me
+Status: 401
+Response: {"detail":"Invalid authorization header"}
+
+[Farms Service] /api/farms
+Status: 401
+Response: {"detail":"Invalid authorization header"}
+
+[Marketplace Service] /api/marketplace/listings
+Status: 500
+Response: Internal Server Error
+

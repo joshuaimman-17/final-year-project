@@ -1,0 +1,9 @@
+fastapi
+firebase-admin
+httpx
+uvicorn
+sqlalchemy
+asyncpg
+python-dotenv
+pydantic
+pydantic-settings

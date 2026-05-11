@@ -1,0 +1,139 @@
+﻿DrPlant: Master Architecture & Engineering Specification
+This document serves as the complete technical blueprint for the DrPlant platform. It outlines the product capabilities (User Stories), the hybrid data layer, and the Backend-for-Frontend (BFF) serverless microservices architecture designed for Vercel.
+Part 1: Product Definition (User Stories)
+1. Farmer (Primary User)
+* Registration: Register via phone and email; complete a profile with a name and avatar.
+* Unified Farm Management: Create a single farm profile capturing location (district, village, GPS coordinates), spatial boundaries (polygon mapping), physical size (acres), and specific crop lifecycle details (crop type, duration, planted date, soil type, irrigation).
+* Environmental Insights: View real-time and forecasted weather/soil data specific to the farm's exact GPS location, fetched dynamically via external APIs (e.g., OpenWeatherMap, Open-Meteo).
+* AI Diagnostics: Request disease diagnosis by uploading an image of a crop directly from their farm plot.
+* Results & Advice: View instant AI results (disease, confidence, severity) and access subsequent manual reviews and treatment plans from experts.
+* Marketplace Selling: Create product listings tied directly to the farm.
+* Social Community (Feed): Upload photos of crops/farms with captions, scroll through an "Insta-like" feed, and engage by "liking" and commenting on posts. Build a network by following peers and experts.
+* Direct Communication: Message experts directly for private consultation.
+* Dashboard: Monitor farm health, weather insights, diagnostic history, active listings, and sales.
+2. Expert / Agronomist
+* Onboarding: Register and upload professional credentials for admin approval.
+* Review Queue: Access a queue of pending AI diagnoses submitted by farmers.
+* Verification & Consultation: Approve AI results or override them manually, providing structured treatment plans.
+* Social Community: Post educational content and localized advice. Engage with farmer posts.
+* Communication: Initiate or reply to direct messages from farmers.
+* Analytics: Track personal metrics (cases reviewed, response time, user ratings).
+3. Buyer
+* Browsing: Search the marketplace catalog anonymously, filtering by crop, location, and price.
+* Cart Management: Add multiple items from different farms into a single shopping cart.
+* Purchasing: Register/login to proceed through checkout, converting cart items into a finalized order.
+* Tracking: Monitor fulfillment status (placed, shipped, delivered).
+4. Admin / Superadmin
+* Moderation: Approve/reject expert applications. Remove flagged community posts.
+* User Management: Deactivate accounts across any role.
+* Analytics: View platform-wide trends, regional outbreaks, and marketplace volume.
+Part 2: Global Database & Storage Strategy
+The system utilizes a hybrid model optimized for independent serverless microservices.
+1. Relational Data (Neon Postgres)
+Neon handles connection pooling automatically for Vercel serverless functions.
+* users: id (UUID), email, role, full_name, avatar_url, is_verified
+* farms: id (UUID), owner_id, farm_name, latitude, longitude, polygon (JSONB), area_acres, crop_type, crop_duration_days, planted_date, soil_type, irrigation
+* diagnoses: id (UUID), farm_id, farmer_id, image_url, ai_raw_result (JSONB), disease_name, confidence, severity, status
+* expert_profiles: id (UUID), user_id, license_number, approval_status, specialization, avg_rating
+* expert_reviews: id (UUID), diagnosis_id, expert_id, overridden, disease_name, treatment_plan, rating
+* marketplace_listings: id (UUID), seller_id, farm_id, crop_name, price_per_unit, quantity_available, status
+* listing_images: id (UUID), listing_id, image_url
+* cart_items: id (UUID), buyer_id, listing_id, quantity
+* orders: id (UUID), buyer_id, total_price, delivery_address, status, placed_at
+* order_items: id (UUID), order_id, listing_id, quantity, price_at_purchase
+* follows: follower_id, following_id
+2. Document Data (Firebase Firestore)
+* posts: author_id, caption, image_urls, likes_count, comments_count, created_at
+   * Subcollection: likes (user_id, created_at)
+   * Subcollection: comments (author_id, text, created_at)
+* conversations: participants, created_at
+   * Subcollection: messages (sender_id, content, attachment_url, sent_at)
+3. Media Storage (Supabase Storage)
+* diagnosis-images/
+* community-posts/
+* listing-images/
+* expert-credentials/
+Part 3: Microservices Architecture (Vercel Serverless)
+Global Patterns
+* Backend-for-Frontend (BFF): The frontend ONLY communicates with the API Gateway. It does not contain Firebase SDKs.
+* Authentication: service-users calls Firebase REST API to log users in and issues a JWT. The frontend passes this JWT as a Bearer token. Other services verify this JWT locally using the Firebase Admin SDK to extract the uid.
+* Real-time: Vercel functions cannot run WebSockets. Real-time updates (like Chat) will be triggered via a serverless Pub/Sub provider (e.g., Pusher).
+Standard Directory Blueprint
+Every microservice repo follows this exact structure for Vercel deployment:
+drplant-service-[name]/
+├── api/
+│   ├── index.py              # Vercel entry point (FastAPI app initialized here)
+│   ├── core/                 # Config, security, exceptions
+│   ├── db/                   # DB engine & session maker
+│   ├── models/               # SQLAlchemy DB models
+│   ├── schemas/              # Pydantic DTOs
+│   ├── services/             # Service functions(business logic)
+│   ├── controllers/          # Controller functions(handle requests/responses and call services)
+│   └── routers/              # FastAPI endpoints
+├── requirements.txt
+└── vercel.json               # Instructs Vercel to run Python
+
+Part 4: Detailed Microservice Specifications
+0. API Gateway (service-gateway)
+* Role: Single point of entry. Routes requests to downstream microservices using httpx. Handles CORS.
+* Endpoints:
+   * /*: Catch-all proxy route mapping paths (/users/*, /farms/*, etc.) to respective downstream Vercel URLs.
+1. Users Service (service-users)
+* Role: Identity management and authentication proxy.
+* Database: drplant_users_db (Postgres)
+* Models (SQLAlchemy): User
+* DTOs (Pydantic): UserCreate, UserLogin, UserRead, TokenResponse
+* Endpoints:
+   * POST /api/users/register: Creates Firebase user, saves to Postgres, returns JWT.
+   * POST /api/users/login: Validates via Firebase REST, returns JWT.
+   * GET /api/users/me: Returns profile of JWT bearer.
+   * PUT /api/users/me: Updates profile details.
+2. Farms Service (service-farms)
+* Role: Manages geographical plots, crops, and external weather/soil data.
+* Database: drplant_farms_db (Postgres)
+* Models: Farm
+* DTOs: FarmCreate (validates polygon), FarmRead, WeatherInsight
+* Endpoints:
+   * POST /api/farms: Creates a new farm.
+   * GET /api/farms: Lists farms for current user.
+   * GET /api/farms/{farm_id}: Retrieves farm details.
+   * GET /api/farms/{farm_id}/weather: Fetches live weather APIs using farm lat/lng.
+3. Diagnostics Service (service-diagnostics)
+* Role: AI orchestration and expert manual reviews.
+* Database: drplant_diagnostics_db (Postgres)
+* Models: Diagnosis, ExpertProfile, ExpertReview
+* DTOs: DiagnosisCreate (takes Supabase image URL), DiagnosisRead, ExpertReviewCreate
+* Endpoints:
+   * POST /api/diagnostics/analyze: Accepts image URL, triggers AI model, saves DB record.
+   * GET /api/diagnostics/farm/{farm_id}: Diagnostic history for a farm.
+   * GET /api/diagnostics/queue: (Expert only) Pending diagnoses across the platform.
+   * POST /api/diagnostics/{diagnosis_id}/review: (Expert only) Submits manual review.
+4. Marketplace Service (service-marketplace)
+* Role: E-commerce catalog, shopping cart, and order processing.
+* Database: drplant_commerce_db (Postgres)
+* Models: MarketplaceListing, CartItem, Order, OrderItem
+* DTOs: ListingCreate, CartItemAdd, CheckoutRequest, OrderRead
+* Endpoints:
+   * GET /api/marketplace/listings: Searchable public catalog.
+   * POST /api/marketplace/listings: (Farmer) Creates a product to sell.
+   * POST /api/marketplace/cart: Adds item to cart.
+   * GET /api/marketplace/cart: Retrieves active cart.
+   * POST /api/marketplace/checkout: Converts cart to Order/OrderItems, clears cart.
+   * GET /api/marketplace/orders: Retrieves buyer order history.
+5. Community Service (service-community)
+* Role: Social feed logic wrapping Firestore via Firebase Admin.
+* Database: Connects to Firestore directly.
+* DTOs: PostCreate, CommentCreate, PostRead
+* Endpoints:
+   * POST /api/community/posts: Creates a new feed post document.
+   * GET /api/community/feed: Retrieves paginated posts.
+   * POST /api/community/posts/{post_id}/like: Toggles a like in subcollection.
+   * POST /api/community/posts/{post_id}/comments: Appends a comment document.
+6. Chat Service (service-chat)
+* Role: Direct messaging wrapping Firestore + Pusher webhook triggers.
+* Database: Connects to Firestore directly.
+* DTOs: ConversationCreate, MessageCreate
+* Endpoints:
+   * POST /api/chat/conversations: Initializes chat thread.
+   * GET /api/chat/conversations: Lists user's active chats.
+   * POST /api/chat/conversations/{conversation_id}/messages: Writes message to Firestore AND pings Pusher API to trigger real-time client socket update.

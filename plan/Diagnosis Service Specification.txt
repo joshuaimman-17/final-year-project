@@ -1,0 +1,102 @@
+﻿Service 4: Diagnosis Service (AI & Expert Consultation)
+The Diagnosis Service is the intelligence hub of Dr. Plant. It orchestrates the flow of data between the farmer's field imagery, the AI inference models, and the agronomist review queue to provide accurate crop health assessments.
+1. Primary Responsibilities
+A. AI Inference Orchestration
+* Async Pipeline: Manages the communication with Hugging Face Inference API. Since AI inference can be slow, it handles the state transitions from UPLOADING to PROCESSING to AI_DIAGNOSED.
+* Multi-Model Support: Capable of routing different crop types to specialized computer vision models (e.g., a specific model for Rice vs. Tomato).
+B. Result Analysis & Storage
+* Probability Mapping: Interprets AI confidence scores. If confidence is below a threshold (e.g., 70%), the service automatically flags the diagnosis for "High Priority" expert review.
+* Severity Assessment: Categorizes the threat level (Healthy, Warning, Critical) to help farmers prioritize their response.
+C. Expert Review Workflow
+* Global Queue: Aggregates all AI-processed diagnoses into a searchable dashboard for verified Experts.
+* Validation & Override: Provides the logic for Experts to confirm the AI's findings or provide a manual override based on their professional judgment.
+* Prescription Engine: Allows Experts to attach detailed "Treatment Plans" (chemical, biological, or cultural controls) to a diagnosis.
+D. Historical Tracking
+* Temporal Analysis: Stores a timeline of health for each specific Field, allowing farmers to see if a disease is recurring or spreading.
+2. Master Entity Definitions (PostgreSQL)
+Entity: Diagnosis
+* id: UUID (Primary Key)
+* field_id: UUID (FK to Field Service)
+* user_id: UUID (FK to User Service - The Farmer)
+* image_url: String (Supabase public link)
+* status: Enum { PROCESSING, AI_DIAGNOSED, EXPERT_REVIEWING, COMPLETED, FAILED }
+* created_at: Timestamp
+Entity: AIDiagnosisResult (1:1 with Diagnosis)
+* diagnosis_id: UUID (FK)
+* suggested_disease: String
+* confidence_score: Float (0.0 - 1.0)
+* raw_ai_output: JSONB (Full response from Hugging Face)
+* processed_at: Timestamp
+Entity: ExpertRecommendation (1:1 with Diagnosis)
+* diagnosis_id: UUID (FK)
+* expert_id: UUID (FK to User Service - The Expert)
+* confirmed_disease: String
+* severity: Enum { LOW, MEDIUM, HIGH, CRITICAL }
+* treatment_plan: Text (Detailed instructions)
+* reviewed_at: Timestamp
+3. Detailed Endpoint Specs
+3.1 Farmer Endpoints
+* POST /api/v1/diagnose:
+   * Input: { "field_id": "...", "image_url": "..." }
+   * Logic: Creates a record, triggers the Hugging Face API call, and returns a task_id.
+* GET /api/v1/diagnose/{id}: Returns the current status and results (AI or Expert) for a specific diagnosis.
+* GET /api/v1/diagnose/history: Returns a list of all diagnoses for the authenticated farmer, filterable by field_id.
+3.2 Expert Endpoints
+* GET /api/v1/expert/queue:
+   * Description: Returns a list of diagnoses with AI_DIAGNOSED status.
+   * Filters: crop_type, confidence_score (lower first), created_at.
+* POST /api/v1/expert/recommend:
+   * Input: { "diagnosis_id": "...", "confirmed_disease": "...", "treatment_plan": "...", "severity": "..." }
+   * Logic: Saves the recommendation and updates the main Diagnosis status to COMPLETED.
+4. AI Model & Tooling Specification
+A. Recommended Models (Hugging Face)
+The service uses the huggingface_hub Python library to call serverless inference endpoints.
+* General Plant Disease: Prasanna-C/plant-disease-classification (Based on Vision Transformer - ViT).
+* Alternative/Backup: microsoft/resnet-50 fine-tuned on the PlantVillage dataset.
+* Specialized (Rice/Wheat): vbookshelf/rice-leaf-diseases-model.
+B. Python Libraries & Tools
+* huggingface_hub (InferenceClient): To manage API calls with retry logic and token authentication.
+* Pillow (PIL): For server-side image validation (aspect ratio, minimum resolution) and generating thumbnails.
+* piexif / ExifRead: To strip sensitive GPS metadata from JPEG files before moving images to public buckets.
+* scipy / numpy: To process raw probability tensors if multi-label classification is required.
+C. Processing Pipeline
+1. Validation: Check if image is > 224x224px.
+2. Sanitization: Strip EXIF data.
+3. Inference: Send bytes to Hugging Face image-classification task.
+4. Post-Processing: Map technical labels (e.g., "Tomato___Late_blight") to human-readable names ("Late Blight in Tomatoes").
+5. Operational Logic & Constraints
+* Threshold Rules: * If AI Confidence > 90% and disease is "Healthy": Status is set to COMPLETED immediately.
+   * If AI Confidence < 70%: Automatically marked as PRIORITY for Expert review.
+* Privacy: Diagnosis images are stored with randomized UUID filenames to prevent URL guessing.
+* Notification Trigger: Upon COMPLETED status, a message is sent to the Community Service to trigger a push notification for the Farmer.
+
+
+Updated Diagnosis Model & API List (Free Tier)
+
+Target Crop: 
+Model ID (Repo): 
+Purpose: 
+Potato
+: 
+Ritesh-Sood/potato-leaf-disease-classification
+Specialized: Optimized for Early Blight, Late Blight, and Healthy leaves.
+Peanut
+: 
+Dunnook/peanut-leaf-disease
+Specialized: Covers Peanut Leaf Spot and Rust, common in sandy soil regions.
+General Crops
+Prasanna-C/plant-disease-classification
+Primary: Use this as a fallback for Tomato, Apple, Grape, etc.
+Rice
+: 
+vbookshelf/rice-leaf-diseases-model
+Specialized: High precision for Rice Blast and Brown Spot.
+Healthy Check
+: 
+microsoft/resnet-50
+Safety Filter: To ensure the user uploaded a plant leaf and not a random object.
+1. Multi-Model Routing LogicIn your Diagnosis Service, you should implement a simple "router" function. This ensures that if a farmer selects "Potato" in their field profile, the AI uses the Potato-specific model for the best results.The Routing Workflow:Fetch Field Data: Get the crop_type from the Farm Service.Select Model: - If Potato -> use Ritesh-Sood/potato-leaf-disease-classification.If Peanut -> use Dunnook/peanut-leaf-disease.Else -> use Prasanna-C/plant-disease-classification.Inference: Send the image to the selected Model ID.2. Complementary Data Sources (Free)To make the "Diagnosis" professional, don't just show the AI result. Combine it with these free data points:OpenWeather Agro API: * Check: If the diagnosis is "Potato Late Blight," check the local humidity.Logic: Late Blight thrives in high humidity (>80%). If humidity is high, mark the diagnosis as "High Confidence - Environmental conditions match disease profile."Agromonitoring NDVI:Check: Look at the field's vegetation index trend.Logic: If NDVI has dropped sharply in the last 7 days, it confirms a rapid disease spread or pest attack.3. Storage & Metadata StrategySince you are using Supabase Storage, organize your folders like this to keep the data structured for the Analytics Service:Bucket: diagnoses/potato/{field_id}/{timestamp}.jpg/peanut/{field_id}/{timestamp}.jpg/general/{field_id}/{timestamp}.jpg4. Implementation Tip: The "Warm-up"Because you are using the Free Tier, these models might "sleep" if they aren't used for a few hours.User Experience Tip: When a user opens the "Diagnose" screen in your app, send a "ping" request to the relevant Hugging Face model immediately. This wakes the model up while the user is still busy taking or selecting their photo, so they don't experience a 10-second delay when they hit "Submit."
+
+
+# HuggingFace Inference API Key
+HUGGINGFACE_API_KEY=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

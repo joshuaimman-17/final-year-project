@@ -1,0 +1,11 @@
+DIAGNOSIS SERVICE TEST REPORT
+=============================
+Status: PASS
+Endpoints Tested:
+- POST /diagnose: 200 OK
+- GET /diagnose/history: 200 OK
+- GET /diagnose/{id}: 200 OK
+- POST /diagnose/{id}/verify: 200 OK
+- GET /diagnose/stats: 200 OK
+=============================
+Result: 100% Success

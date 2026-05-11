@@ -1,0 +1,8 @@
+fastapi
+sqlalchemy
+asyncpg
+firebase-admin
+httpx
+pydantic[email]
+uvicorn
+aiosmtplib

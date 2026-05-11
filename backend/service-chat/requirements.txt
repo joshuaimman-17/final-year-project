@@ -1,0 +1,5 @@
+fastapi
+firebase-admin
+pusher
+httpx
+uvicorn

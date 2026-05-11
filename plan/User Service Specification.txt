@@ -1,0 +1,64 @@
+﻿Service 3: User Service (Identity & Profile Management)
+The User Service manages the lifecycle of Dr. Plant users. While Firebase handles technical authentication, this service manages the business logic: user profiles, role-based permissions, expert verification, and identity synchronization.
+1. Primary Responsibilities
+A. Profile Synchronization & Onboarding
+* Lazy Onboarding: When a user first signs up via Firebase, this service creates a corresponding record in Neon PostgreSQL. If the user arrives via a marketplace link, the service ensures a "Buyer" profile is initialized.
+* Metadata Management: Stores and updates names, phone numbers, and avatar URLs (Supabase).
+* Presence & Activity: Updates last_active_at timestamps to help Experts identify active farmers for consultation.
+B. Role & Permission Management
+* Role Transitions: Handles the logic for a user changing roles (e.g., a Farmer becoming an Expert after verification).
+* Access Control: Serves as the source of truth for the API Gateway's authorization checks.
+C. Expert Verification Pipeline
+* Multi-Stage Workflow: Manages the transition from UNVERIFIED -> PENDING_REVIEW -> VERIFIED or REJECTED.
+* Credential Security: Interface with Supabase to store sensitive PDFs (licenses/degrees) in a private bucket accessible only by authorized Admins.
+* Rejection Logic: Allows Admins to provide specific feedback for rejection so users can resubmit corrected documents.
+D. Social Graph & Trust
+* Follower Management: Relational tracking of who follows whom. This data is synced to Firestore for the community feed but persisted in PostgreSQL for integrity.
+* Expert Ratings: Aggregates feedback from the Diagnosis Service to calculate an expert's "Trust Score" or average rating.
+2. Master Entity Definitions (PostgreSQL)
+Entity: User
+* id: UUID (Primary Key)
+* firebase_uid: String (Unique Index)
+* email: String (Unique)
+* phone: String (Unique)
+* full_name: String
+* avatar_url: String
+* role: Enum { FARMER, EXPERT, BUYER, ADMIN }
+* is_active: Boolean (Default: True)
+* last_active_at: Timestamp
+* created_at: Timestamp
+Entity: ExpertProfile
+* user_id: UUID (FK to User)
+* license_number: String
+* specialization: String
+* credentials_url: String (Private Supabase Link)
+* verification_status: Enum { PENDING, APPROVED, REJECTED }
+* rejection_reason: Text (Optional)
+* verified_at: Timestamp
+* verified_by: UUID (FK to Admin User)
+Entity: Follows (Junction Table)
+* follower_id: UUID (FK to User)
+* following_id: UUID (FK to User)
+* created_at: Timestamp
+3. Detailed Endpoint Specs
+3.1 Public & Authenticated User Endpoints
+* GET /api/v1/users/me: Fetches the authenticated user's full profile and role.
+* PATCH /api/v1/users/profile: Updates full_name, avatar_url, and contact preferences.
+* POST /api/v1/users/expert-apply: Submits ExpertProfile data and flips status to PENDING.
+* DELETE /api/v1/users/account: Deactivates account (soft delete). Checks for active orders or pending diagnoses first.
+3.2 Social & Discovery Endpoints
+* GET /api/v1/users/experts: Returns a list of APPROVED experts. Filterable by specialization.
+* POST /api/v1/users/follow/{id}: Creates a follow record. Triggers a notification in the Community Service.
+* DELETE /api/v1/users/follow/{id}: Removes a follow record.
+* GET /api/v1/users/{id}/followers: Returns a list of users following the target ID.
+3.3 Administrative Endpoints (Admin Only)
+* GET /api/v1/admin/users/pending-experts: Lists all users with verification_status: PENDING.
+* PATCH /api/v1/admin/users/{id}/verify:
+   * Input: { "status": "APPROVED" | "REJECTED", "reason": "..." }
+   * Logic: Updates ExpertProfile. If approved, updates the User.role to EXPERT.
+* PATCH /api/v1/admin/users/{id}/status: Toggle is_active to ban/suspend users.
+4. Operational Logic & Constraints
+* Atomic Role Promotion: When an admin approves an expert, the database transaction must update both the ExpertProfile status and the User role field simultaneously.
+* Soft Deletion: To preserve marketplace transaction history, users are never fully deleted from the DB; is_active is set to false.
+* Sync Logic: Any change to a user's role or follow count in PostgreSQL triggers a background sync to the users collection in Firestore to ensure the UI updates instantly.
+* Security: The credentials_url must never be exposed to the public; it is only returned in the Admin review endpoints.

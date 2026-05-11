@@ -1,0 +1,90 @@
+﻿Service 2: Farm Service (GIS & Asset Management)
+The Farm Service is the geospatial and agronomic heart of Dr. Plant. It manages the digital twin of the farmer's land, coordinates satellite monitoring, tracks individual crop life cycles, and provides hyper-local environmental intelligence.
+1. Primary Responsibilities
+A. Digital Farm Twin & Asset Hierarchy
+* Structural Management: Maintains the core hierarchy: User (Owner) -> Farm (Regional Hub) -> Field (Geospatial Plot).
+* Resource Metadata: Stores persistent plot data including topography, irrigation infrastructure, and primary soil classifications.
+B. Geospatial Intelligence
+* Polygon Processing: Validates GeoJSON data for field boundaries. Ensures polygons are closed, non-self-intersecting, and compliant with WGS84.
+* Spatial Analytics: Computes exact area (Hectares/Acres) and provides distance-based proximity logic for localized alerts.
+C. Crop Cycle & Growth Tracking
+* Seasonal Logging: Manages "Crop Cycles" for each field, tracking exactly what was planted, when it was planted, and its current growth stage.
+* Yield Prediction: Aggregates historical field performance and current satellite health data to provide estimated harvest windows and yields.
+D. Environmental & Soil Intelligence
+* Soil Health Registry: Tracks historical soil analysis reports (NPK levels, pH, organic carbon) and real-time moisture/temperature data.
+* Agro-Weather Engine: Provides specialized metrics like Growing Degree Days (GDD), Evapotranspiration, and frost/heat-stress risk alerts via OpenWeather Agro API.
+E. External GIS Synchronization
+* Satellite Monitoring: Registers polygons with Agromonitoring API to fetch NDVI (Vegetation), EVI (Health), and NDWI (Water) indices.
+2. Master Entity Definitions (PostgreSQL)
+Entity: Farm
+* id: UUID (PK)
+* owner_id: UUID (FK to User Service)
+* name: String
+* village/district/state: String
+* created_at: Timestamp
+Entity: Field
+* id: UUID (PK)
+* farm_id: UUID (FK to Farm)
+* agromonitoring_id: String (External ID)
+* polygon: JSONB (GeoJSON)
+* area_hectares: Float
+* soil_type_baseline: Enum { CLAY, LOAMY, SANDY, BLACK, RED }
+* irrigation_type: Enum { DRIP, SPRINKLER, RAINFED, CANAL }
+Entity: CropCycle (Season Management)
+* id: UUID (PK)
+* field_id: UUID (FK)
+* crop_name: String (e.g., "Sona Masuri Rice")
+* variety: String
+* planting_date: Date
+* expected_harvest_date: Date
+* actual_harvest_date: Date (Optional)
+* initial_quantity_seeds: Float
+* status: Enum { PLANNED, ACTIVE, HARVESTED, FAILED }
+* current_growth_stage: Enum { SEEDLING, VEGETATIVE, FLOWERING, RIPENING }
+Entity: SoilReport
+* id: UUID (PK)
+* field_id: UUID (FK)
+* ph_level: Float
+* nitrogen/phosphorus/potassium: Float (ppm)
+* organic_matter: Float (%)
+* recorded_at: Timestamp
+Entity: EnvironmentalCache
+* id: UUID (PK)
+* field_id: UUID (FK)
+* ndvi_score: Float
+* soil_moisture_index: Float
+* accumulated_gdd: Float (Growing Degree Days)
+* evapotranspiration: Float
+* captured_at: Timestamp
+3. Data Transfer Objects (DTOs)
+FieldDetailedDTO
+* metadata: Field Entity
+* active_crop: CropCycle Entity (Current)
+* latest_health: EnvironmentalCache Entity
+* weather_forecast: List
+CropCycleCreateDTO
+* field_id: UUID
+* crop_name: String
+* planting_date: Date
+* expected_duration_days: Integer
+4. Detailed Endpoint Specs
+4.1 Asset & Crop Management
+* POST /api/v1/farms: Create a farm.
+* POST /api/v1/fields: Create a field, validate polygon, and sync with GIS APIs.
+* POST /api/v1/fields/{id}/crop-cycle: Start a new planting season for a specific field.
+* GET /api/v1/fields/{id}/summary: Returns the "Master View" (Field metadata + current crop + current health).
+4.2 Agronomic Data Endpoints
+* GET /api/v1/fields/{id}/weather:
+   * Logic: Returns 7-day forecast including Precipitation probability, GDD, and Wind speed (for spraying window optimization).
+* GET /api/v1/fields/{id}/soil-history: Returns time-series data of NPK/pH levels to track soil depletion or improvement.
+* GET /api/v1/fields/{id}/satellite-gallery: Returns historical RGB and NDVI images from Agromonitoring.
+5. Operational Logic & Constraints
+A. Crop Stage Logic
+* The service automatically advances the current_growth_stage based on planting_date and crop-specific "days-to-maturity" constants, which are then refined by satellite NDVI triggers.
+B. Weather-Sensitive Alerts
+* Spraying Window: Logic to alert farmers if wind speeds > 15km/h or rain is expected within 4 hours, advising against pesticide application.
+* Frost/Heat Guard: Triggers notifications if temperatures cross crop-specific critical thresholds.
+C. Polygon & Area Integrity
+* Validation: Re-validates polygons every time a CropCycle is started to ensure the area calculation remains the source of truth for seed/fertilizer inputs.
+D. Data Privacy
+* Precise GIS coordinates are stripped when data is sent to the Diagnosis Service for "Public Gallery" purposes, ensuring the farmer's property location remains private.

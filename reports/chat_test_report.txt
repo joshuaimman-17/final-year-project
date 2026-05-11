@@ -1,0 +1,11 @@
+CHAT SERVICE TEST REPORT
+========================
+Status: PASS
+Endpoints Tested:
+- POST /chat/rooms: 201 OK
+- GET /chat/rooms: 200 OK
+- POST /chat/messages: 201 OK
+- GET /chat/messages/{room_id}: 200 OK
+- POST /chat/broadcast: 202 Accepted
+========================
+Result: 100% Success

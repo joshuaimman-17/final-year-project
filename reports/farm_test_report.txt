@@ -1,0 +1,11 @@
+FARM SERVICE TEST REPORT
+========================
+Status: PASS
+Endpoints Tested:
+- GET /farms: 200 OK
+- POST /farms: 201 OK
+- GET /farms/{id}: 200 OK
+- GET /farms/{id}/field: 200 OK
+- GET /farms/{id}/spraying-window: 200 OK
+========================
+Result: 100% Success

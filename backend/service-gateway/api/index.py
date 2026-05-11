@@ -7,6 +7,7 @@ app = FastAPI(title="Dr.Plant API Gateway", docs_url=None)
 
 app.add_middleware(
     CORSMiddleware,
+    allow_origin_regex="https://.*\.vercel\.app",
     allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],

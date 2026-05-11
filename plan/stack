@@ -1,0 +1,37 @@
+Technical Stack
+
+Layer
+
+Technology
+
+Backend Framework
+
+FastAPI (Python 3.11+)
+
+Deployment
+
+Vercel Serverless Functions
+
+Primary Database
+
+Neon PostgreSQL (Relational Data & Geospatial)
+
+Real-time / NoSQL
+
+Firebase Firestore (Social, Chat, Community)
+
+Authentication
+
+Firebase Auth (Phone OTP & Email)
+
+File Storage
+
+Supabase Storage (S3-compatible)
+
+Machine Learning
+
+Hugging Face Inference API (Serverless ML)
+
+External GIS Data
+
+Agromonitoring API & OpenWeather Agro

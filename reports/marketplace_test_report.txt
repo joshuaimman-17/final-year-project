@@ -1,0 +1,11 @@
+MARKETPLACE SERVICE TEST REPORT
+===============================
+Status: PASS
+Endpoints Tested:
+- GET /marketplace/listings: 200 OK
+- POST /marketplace/listings: 201 OK
+- GET /marketplace/listings/{id}: 200 OK
+- POST /marketplace/orders: 201 OK
+- GET /marketplace/orders/history: 200 OK
+===============================
+Result: 100% Success

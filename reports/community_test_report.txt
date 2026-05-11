@@ -1,0 +1,11 @@
+COMMUNITY SERVICE TEST REPORT
+=============================
+Status: PASS
+Endpoints Tested:
+- GET /community/feed: 200 OK
+- POST /community/posts: 201 OK
+- POST /community/posts/{id}/like: 200 OK
+- GET /community/posts/{id}/comments: 200 OK
+- POST /community/posts/{id}/comments: 201 OK
+=============================
+Result: 100% Success

@@ -1,0 +1,299 @@
+﻿Dr. Plant: Frontend Sitemap & Role-Based Access Control (RBAC)
+This document outlines the page structure of the Dr. Plant PWA, detailing the purpose of each page and the specific permissions required for access.
+1. User Roles Overview
+* Guest (G): Unauthenticated visitors. Can browse the marketplace but cannot purchase or interact.
+* Farmer (F): Full agricultural suite. Manages land, diagnoses crops, sells/buys in marketplace, and interacts in community.
+* Buyer (B): Strictly transactional. Access is limited to browsing, buying, and tracking orders. No social or agricultural tool access.
+* Expert (E): Verified agronomists. Reviews AI diagnoses, provides consultations, and engages in the community.
+* Admin (A): Platform moderators and system analysts.
+2. Page Directory & Functionality
+#
+	Page Name
+	Path
+	Access
+	Key Functionality
+	1
+	Landing Page
+	/
+	All
+	Hero section, platform features, "Join as Expert" CTA.
+	2
+	Auth (Login/Signup)
+	/auth
+	G
+	Phone OTP and Email authentication via Firebase.
+	3
+	Global Dashboard
+	/dashboard
+	F, B, E, A
+	Navigation hub: Role-specific stats, weather, and alerts.
+	4
+	Farm List
+	/farms
+	F
+	List of registered farms (Farmer Only).
+	5
+	Field Map & GIS
+	/farms/[id]/field
+	F
+	Full-screen polygon drawing and health layers (Farmer Only).
+	6
+	AI Diagnosis Start
+	/diagnose/new
+	F
+	Camera interface for health check (Farmer Only).
+	7
+	Diagnosis History
+	/diagnose
+	F, E
+	Personal history (Farmer) or Global list (Expert).
+	8
+	Diagnosis Result
+	/diagnose/[id]
+	F, E
+	AI results, Expert overrides, and treatment plans.
+	9
+	Expert Review Queue
+	/expert/queue
+	E
+	Workflow for manual AI result verification (Expert Only).
+	10
+	Marketplace Home
+	/marketplace
+	All
+	Searchable grid of crops with location-based filtering.
+	11
+	Listing Detail
+	/marketplace/[id]
+	All
+	Product gallery, seller ratings, and buy options.
+	12
+	Cart & Checkout
+	/marketplace/checkout
+	B, F, E
+	Multi-step payment and address flow.
+	13
+	Seller Dashboard
+	/marketplace/seller
+	F
+	Manage listings, inventory, and confirm sales (Farmer Only).
+	14
+	Order History
+	/orders
+	B, F, E
+	Track purchases and delivery status.
+	15
+	Community Feed
+	/community
+	F, E
+	Social social posts and regional tips (F/E Only).
+	16
+	Create Post
+	/community/new
+	F, E
+	Rich text/image uploader for social engagement (F/E Only).
+	17
+	Messenger Inbox
+	/messages
+	F, B, E
+	Inbox for trade chats or consultation threads.
+	18
+	Chat Room
+	/messages/[id]
+	F, B, E
+	Real-time messaging with media and reaction features.
+	19
+	User Profile
+	/profile/[id]
+	All
+	Public identity, trust scores, and portfolio.
+	20
+	Expert Verification
+	/profile/apply
+	F
+	Form to apply for Expert role upgrade.
+	21
+	Admin Dashboard
+	/admin
+	A
+	Management of users, approvals, and flags.
+	22
+	System Settings
+	/settings
+	All
+	Language and notification preferences.
+	3. Role-Based Page Access Matrix
+Role
+	GIS & Diagnosis
+	Selling Access
+	Social (Feed/Posts)
+	Marketplace (Buy)
+	Farmer
+	✅ Yes
+	✅ Yes
+	✅ Yes
+	✅ Yes
+	Buyer
+	❌ No
+	❌ No
+	❌ No
+	✅ Yes
+	Expert
+	✅ Read-only
+	❌ No
+	✅ Yes
+	✅ Yes
+	Admin
+	✅ Audit-only
+	✅ Audit-only
+	✅ Audit-only
+	✅ Audit-only
+	4. Mobile PWA Specific Pages
+* Offline Fallback (/offline): Displayed when a user tries to access a non-cached page without internet.
+* PWA Install Guide: Custom modal appearing on the landing page for first-time visitors.
+5. Implementation Strategy (Next.js App Router)
+* (auth)/*: Public-facing auth pages.
+* (dashboard)/*: Layout with sidebar/bottom-nav for authenticated users.
+* (marketplace)/*: E-commerce focused layout.
+* (admin)/*: Specialized high-privilege management layout.
+6. Detailed Page Breakdown
+6.1 Landing Page (/)
+* Roles: All
+* Features & Actions: Browse platform capabilities, view trust stats, select language, navigate to login.
+* Visual Elements: Animated hero, platform value-proposition cards, live "Expert Online" count, Footer.
+* Background Processes: Session verification; redirection if already authenticated.
+* Forms: Newsletter Signup (Email).
+6.2 Auth (Login/Signup) (/auth)
+* Roles: Guest (G)
+* Features & Actions: Authenticate via Phone OTP or Email, choose role (Farmer/Buyer), agree to TOS.
+* Visual Elements: Tabbed Login/Signup UI, OTP countdown, Role selection illustrations.
+* Background Processes: Firebase Auth handshake; User Service profile creation.
+* Forms: Login Form, Signup Form (Role selection), OTP Input Form.
+6.3 Global Dashboard (/dashboard)
+* Roles: All Authenticated
+* Features & Actions:
+   * Farmer: Check field health trends, local weather, and alert count.
+   * Buyer: Track active orders, see trending local crops.
+   * Expert: View pending review count, active consultations, and rating stats.
+   * Admin: Monitor platform health, reported content, and pending expert applications.
+* Visual Elements:
+   * Farmer: Weather widget, Health Status Grid, "Diagnose Now" FAB.
+   * Buyer: "My Purchases" timeline, "Nearby Deals" grid.
+   * Expert: Tasks counter, Consultation request feed.
+   * Admin: KPI charts, Moderation Alert badges.
+* Background Processes: Conditional rendering based on x-user-role; parallel fetching of weather and alerts.
+* Forms: None.
+6.4 Farm List (/farms)
+* Roles: Farmer (F)
+* Features & Actions: List farms, delete/edit farms, add new farm locations.
+* Visual Elements: Farm list cards, location tags, acreage summaries.
+* Background Processes: Fetching farm metadata from Farm Service.
+* Forms: Add Farm Form (Name, Village, Region).
+6.5 Field Map & GIS (/farms/[id]/field)
+* Roles: Farmer (F)
+* Features & Actions: Draw field polygons, toggle satellite/NDVI layers, view field-specific soil data.
+* Visual Elements: Mapbox Map, Drawing tools, Legend drawer, Health metric bottom-sheet.
+* Background Processes: GeoJSON validation; Agromonitoring API synchronization.
+* Forms: Field Details Form (Crop, Soil, Irrigation).
+6.6 AI Diagnosis Start (/diagnose/new)
+* Roles: Farmer (F)
+* Features & Actions: Take/Upload leaf photo, select crop type (Rice, Peanut, Potato, etc.).
+* Visual Elements: Camera overlay, crop icons, upload progress bar.
+* Background Processes: Image compression; routing to specialized Hugging Face models.
+* Forms: Diagnosis Request Form (Field/Crop selection).
+6.7 Diagnosis History (/diagnose)
+* Roles: Farmer (F), Expert (E)
+* Features & Actions: Filter by status/crop, search results, view expert notes.
+* Visual Elements: List of diagnosis cards with confidence badges.
+* Background Processes: Querying Diagnosis Service history.
+* Forms: History Search/Filter Form.
+6.8 Diagnosis Result (/diagnose/[id])
+* Roles: Farmer (F), Expert (E)
+* Features & Actions: View AI analysis, treatment plans, and expert verified notes.
+* Visual Elements: High-res image view, confidence gauge, treatment instruction block.
+* Background Processes: Real-time listener for Expert validation.
+* Forms: (Expert Only) Validation Form (Diagnosis override, severity, notes).
+6.9 Expert Review Queue (/expert/queue)
+* Roles: Expert (E)
+* Features & Actions: Browse unverified AI results, filter by crop specialty.
+* Visual Elements: Task list with urgency markers (low-confidence first).
+* Background Processes: Fetching unreviewed records.
+* Forms: Queue Filter Form.
+6.10 Marketplace Home (/marketplace)
+* Roles: All
+* Features & Actions: Search crops, distance-based filtering, browse categories.
+* Visual Elements: Search bar, category tabs, product cards (Price, Distance).
+* Background Processes: Geospatial sorting via Marketplace Service.
+* Forms: Marketplace Filter/Search Form.
+6.11 Listing Detail (/marketplace/[id])
+* Roles: All
+* Features & Actions: View gallery, check seller rating, add to cart.
+* Visual Elements: Image carousel, Seller info, "Freshness" timeline.
+* Background Processes: Real-time stock availability check.
+* Forms: Quantity Selection Form.
+6.12 Cart & Checkout (/marketplace/checkout)
+* Roles: Buyer, Farmer, Expert
+* Features & Actions: Enter address, select payment, confirm order.
+* Visual Elements: Cart summary, Map-based address picker, Payment gateway UI.
+* Background Processes: Inventory locking; Payment intent creation.
+* Forms: Shipping & Payment Form.
+6.13 Seller Dashboard (/marketplace/seller)
+* Roles: Farmer (F)
+* Features & Actions: Create listings, manage stock, confirm shipment.
+* Visual Elements: Sales chart, Active listings table, New order alerts.
+* Background Processes: Aggregating sales metrics.
+* Forms: New Listing Form (Price, Qty, Crop, Images).
+6.14 Order History (/orders)
+* Roles: Buyer, Farmer, Expert
+* Features & Actions: Track delivery, confirm receipt, rate seller.
+* Visual Elements: Order timeline stepper, tracking details, rating stars.
+* Background Processes: Order status listeners.
+* Forms: Review & Rating Form.
+6.15 Community Feed (/community)
+* Roles: Farmer (F), Expert (E)
+* Features & Actions: Like/Comment, follow users, browse regional tips.
+* Visual Elements: Infinite scroll feed, Trending sidebar, Post creator.
+* Background Processes: Location-aware feed prioritization.
+* Forms: Community Search Form.
+6.16 Create Post (/community/new)
+* Roles: Farmer (F), Expert (E)
+* Features & Actions: Write text, tag crops, upload field photos.
+* Visual Elements: Text editor, Image grid, tag picker.
+* Background Processes: Media upload to Supabase; content indexing.
+* Forms: New Post Form.
+6.17 Messenger Inbox (/messages)
+* Roles: All Authenticated
+* Features & Actions: Search users (F/E only), view threads, archive messages, broadcast (F/E only).
+* Visual Elements: Searchable thread list, Online indicators, Message snippets.
+* Background Processes: Firestore room listener.
+* Forms: User Search Form.
+6.18 Chat Room (/messages/[id])
+* Roles: All Authenticated
+* Features & Actions: Send text/media, react, reply. Buyers are restricted to Order/Listing contexts only.
+* Visual Elements: Bubble view, context banner (Order/Listing), typing status.
+* Background Processes: Real-time stream; media scanning.
+* Forms: Message Input Field.
+6.19 User Profile (/profile/[id])
+* Roles: All
+* Features & Actions: View history, check trust score, follow/unfollow.
+* Visual Elements: User header, specialized portfolios (Expert), Feed grid.
+* Background Processes: Metadata fetch.
+* Forms: Profile Edit Form (Owner).
+6.20 Expert Verification (/profile/apply)
+* Roles: Farmer (F)
+* Features & Actions: Upload license, describe specialty, submit for review.
+* Visual Elements: Document upload zones, specialization checklist.
+* Background Processes: Private file upload; application log.
+* Forms: Expert Application Form.
+6.21 Admin Dashboard (/admin)
+* Roles: Admin (A)
+* Features & Actions: Approve experts, moderate posts, view site analytics.
+* Visual Elements: Review queues, KPI dashboards, moderation logs.
+* Background Processes: Cross-service audit access.
+* Forms: Admin Decision Form.
+6.22 System Settings (/settings)
+* Roles: All Authenticated
+* Features & Actions: Toggle alerts, change language, delete account.
+* Visual Elements: List toggles, language selector, delete account modal.
+* Background Processes: Updating User Service preferences.
+* Forms: Preferences Form.

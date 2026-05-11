@@ -1,0 +1,73 @@
+﻿Service 6: Community Service (Social Engine & Engagement)
+The Community Service is the social heart of Dr. Plant. It manages the "Social Graph" (follows) and the "Engagement Layer" (posts, likes, and threaded comments), allowing farmers and experts to share knowledge and build professional networks.
+1. Primary Responsibilities
+A. Community Feed & Content Lifecycle
+* Post Management: Handles user-generated content, including image-rich posts, agricultural queries, and success stories.
+* Geographical Discovery: Filters and prioritizes content based on the user's district and state to ensure local relevance.
+* Threaded Discussions: Manages a multi-level comment system (Post -> Comment -> Reply) to facilitate detailed agricultural troubleshooting.
+B. Engagement & Social Graph
+* Interactions: Manages atomic "Like" operations for posts and comments to signal content quality.
+* Follower Logic: Maintains the relationship between users (Farmers following Experts, or Farmers following peers), creating a personalized feed experience.
+* Activity Tracking: Aggregates engagement metrics (total likes, total follows) to help calculate user trust scores.
+C. Content Moderation & Compliance
+* Automated Filtering: Scans posts and comments for spam or prohibited content using keyword blacklists.
+* Reporting Workflow: Allows users to flag inappropriate content, triggering administrative review.
+2. Master Entity Definitions
+2.1 Firebase Firestore (Real-time Layer)
+* Collection: posts
+   * { id, author_id, content, image_urls[], tags[], likes_count, comments_count, location_context: {district, state}, timestamp }
+* Collection: comments (Sub-collection under posts/{postId}/comments)
+   * { id, author_id, text, likes_count, replies_count, timestamp }
+* Collection: replies (Sub-collection under comments/{commentId}/replies)
+   * { id, author_id, text, timestamp }
+* Collection: social_notifications
+   * { user_id, type: "LIKE"|"COMMENT"|"FOLLOW", actor_id, target_id, is_read: false, created_at }
+2.2 Neon PostgreSQL (Integrity & Relationship Layer)
+* Entity: Follows
+   * id: UUID (PK)
+   * follower_id: UUID (FK to User Service)
+   * following_id: UUID (FK to User Service)
+   * created_at: Timestamp
+* Entity: UserInteraction
+   * id: UUID (PK)
+   * user_id: UUID (FK)
+   * target_type: Enum { POST, COMMENT, REPLY }
+   * target_id: UUID
+   * interaction_type: Enum { LIKE, FLAG }
+3. Data Transfer Objects (DTOs)
+PostCreateDTO
+* content: String
+* image_urls: List
+* tags: List
+CommentCreateDTO
+* text: String
+* parent_post_id: UUID
+ReplyCreateDTO
+* text: String
+* parent_comment_id: UUID
+4. Detailed Endpoint Specs
+4.1 Social Feed & Posting
+* GET /api/v1/community/feed: Returns a paginated list of posts. Logic: Sorts by timestamp and filters by location_context matching the user's profile.
+* POST /api/v1/community/posts: Creates a new post in Firestore and returns the post_id.
+* DELETE /api/v1/community/posts/{id}: Soft-deletes a post (marks as hidden).
+4.2 Threaded Engagement
+* POST /api/v1/community/posts/{id}/comments: Adds a top-level comment to a post. Increments comments_count in the parent post.
+* POST /api/v1/community/comments/{id}/replies: Adds a reply to a specific comment. Increments replies_count in the parent comment.
+* POST /api/v1/community/{target_type}/{id}/like:
+   * Logic: 1. Check UserInteraction to prevent double-likes.
+2. Atomically increment likes_count in Firestore.
+3. Generate a social_notification for the author.
+4.3 Social Graph (Follows)
+   * POST /api/v1/community/follow/{userId}: Creates a follow relationship.
+   * DELETE /api/v1/community/follow/{userId}: Removes a follow relationship.
+   * GET /api/v1/community/users/{userId}/followers: Returns a list of users following the target.
+5. Operational Logic & Constraints
+A. Atomic Counter Consistency
+   * Firestore Sharding: For highly viral posts, the service uses distributed counters to handle high-frequency "Like" updates without contention errors.
+   * Reconciliation: A background worker compares PostgreSQL interaction totals with Firestore counts every 24 hours to fix any drift caused by network failures.
+B. Deep Threading Limits
+   * Nesting: To maintain UI readability on mobile devices, the service enforces a maximum of 2 levels of nesting (Post -> Comment -> Reply). Any further discussion is handled as a flat reply to the top-level comment.
+C. Geographical Feed Logic
+   * If a user has no "followed" activity, the feed defaults to the "Global Trending" algorithm, which prioritizes posts with high likes_count and comments_count from the last 48 hours.
+D. Automated Moderation
+   * Reporting: If a post or comment accumulates 5 FLAG interactions in PostgreSQL, the is_hidden flag is set to true in Firestore, and the content is removed from the public feed pending Admin review.

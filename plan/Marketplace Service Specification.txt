@@ -1,0 +1,101 @@
+﻿Service 5: Marketplace Service (Agri-Commerce & Fulfillment)
+The Marketplace Service is the commercial engine of Dr. Plant. It facilitates the direct sale of crops from Farmers to Buyers (and Experts), managing inventory, multi-dimensional search discovery, payment lifecycles, and user-generated reviews.
+1. Primary Responsibilities
+A. Listing & Inventory Management
+* Cataloging: Allows Farmers to create detailed listings for their harvests, including crop variety, grade/quality, quantity available (kg/tons), harvest date, and price per unit.
+* Media Association: Links listings to high-quality images stored in Supabase to build buyer trust.
+* Dynamic Inventory: Employs optimistic locking to handle inventory deductions and restorations during order cancellations.
+B. Discovery & Geospatial Search
+* Localized Browsing: Integrates with the Farm Service to allow buyers to find produce within a specific radius based on farm coordinates.
+* Advanced Filtering: Filters by crop category, price range, organic certification, harvest date (freshness), and seller rating.
+C. Order & Payment Lifecycle
+* Transaction State Machine: Manages the transition: PENDING_PAYMENT -> PLACED -> CONFIRMED -> SHIPPED -> DELIVERED -> COMPLETED.
+* Payment Integration: Handles payment intent creation, webhook processing (e.g., Stripe/Razorpay), and escrow-style release logic.
+D. Reputation & Trust
+* Reviews & Ratings: Enables buyers to rate the quality of produce and the reliability of the seller after a successful delivery.
+* Seller Score: Aggregates ratings into a "Seller Trust Score" visible on listing pages.
+2. Master Entity Definitions (PostgreSQL)
+Entity: Listing
+* id: UUID (PK)
+* farmer_id: UUID (FK to User)
+* farm_id: UUID (FK to Farm)
+* crop_name: String
+* category: Enum { CEREALS, VEGETABLES, FRUITS, PULSES, OTHER }
+* price_per_unit: Decimal(12,2)
+* unit: Enum { KG, QUINTAL, TON }
+* available_quantity: Float
+* status: Enum { ACTIVE, SOLD_OUT, ARCHIVED }
+* is_organic: Boolean
+* image_urls: String[]
+Entity: Order
+* id: UUID (PK)
+* buyer_id: UUID (FK to User)
+* seller_id: UUID (FK to User)
+* total_amount: Decimal(12,2)
+* platform_fee: Decimal(10,2)
+* status: Enum { PENDING_PAYMENT, PLACED, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, RETURNED }
+* shipping_address: JSONB { street, city, state, zip }
+Entity: OrderItem
+* id: UUID (PK)
+* order_id: UUID (FK to Order)
+* listing_id: UUID (FK to Listing)
+* quantity: Float
+* price_at_purchase: Decimal(12,2)
+Entity: Review
+* id: UUID (PK)
+* order_id: UUID (FK to Order)
+* author_id: UUID (FK to User)
+* target_user_id: UUID (FK to User)
+* rating: SmallInt (1-5)
+* comment: Text
+* created_at: Timestamp
+3. Data Transfer Objects (DTOs)
+ListingRequestDTO
+* farm_id: UUID
+* crop_name: String
+* price_per_unit: Decimal
+* unit: String
+* quantity: Float
+* image_urls: String[]
+OrderCreateDTO
+* items: List<{ listing_id: UUID, quantity: Float }>
+* shipping_address: Object
+* payment_method_id: String
+OrderResponseDTO
+* order_id: UUID
+* status: String
+* total_price: Decimal
+* estimated_delivery: Date
+4. Detailed Endpoint Specs
+4.1 Inventory Endpoints
+* POST /api/v1/marketplace/listings: Create new listing. Validates owner of farm_id.
+* GET /api/v1/marketplace/search: Search with query params (lat, long, radius, crop, sort).
+* GET /api/v1/marketplace/listings/{id}: Public details + Seller Rating info.
+4.2 Checkout & Order Endpoints
+* POST /api/v1/marketplace/orders:
+   1. Validate inventory availability.
+   2. Create Order in PENDING_PAYMENT status.
+   3. Return Payment Intent secret.
+* GET /api/v1/marketplace/orders/{id}: Order tracking details.
+* PATCH /api/v1/marketplace/orders/{id}/status: Update status (e.g., Seller marks as SHIPPED).
+4.3 Review Endpoints
+* POST /api/v1/marketplace/orders/{id}/reviews:
+   * Logic: Only allowed if Order.status == COMPLETED and author_id == buyer_id.
+* GET /api/v1/marketplace/users/{id}/reviews: Public feed of ratings for a seller.
+5. Operational Logic & Constraints
+A. Inventory Locking Logic
+1. Selection: Buyer adds to cart (Inventory is not locked yet).
+2. Checkout: When POST /orders is called, the system attempts an atomic decrement:
+UPDATE listings SET available_quantity = available_quantity - :qty WHERE id = :id AND available_quantity >= :qty.
+3. Timeout: If payment is not received within 15 minutes, the order is CANCELLED and inventory is incremented back.
+B. Payment Webhook Logic
+   * Upon receipt of payment_intent.succeeded:
+   1. Update Order.status to PLACED.
+   2. Notify Farmer via Community Service.
+   3. Log transaction in Analytics Service.
+C. Commission Calculation
+   * Total Price = (Quantity * Price) + Shipping.
+   * Platform Fee = 5% of Subtotal.
+   * Escrow: Platform holds Total Price minus Commission until DELIVERED status is confirmed + 48-hour dispute window.
+D. Rating Aggregation
+   * When a new review is posted, the Expert/Farmer profile in the User Service is notified to recalculate the cached average_rating.

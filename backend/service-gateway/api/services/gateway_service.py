@@ -30,6 +30,10 @@ class GatewayService:
         headers = dict(request.headers)
         params = dict(request.query_params)
         
+        # Log for debugging auth issues
+        auth_header = headers.get("authorization", "MISSING")
+        print(f"DEBUG Gateway: Forwarding {request.method} to {url}. Auth: {auth_header[:20]}...")
+
         if 'host' in headers:
             del headers['host']
 

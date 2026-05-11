@@ -1,0 +1,75 @@
+﻿Service 7: Chat Service (Complete Messaging & Broadcast System)
+The Chat Service is a high-performance, real-time messaging engine designed to facilitate "Instagram-style" communication. It supports direct messaging (DMs), group chats, user discovery, and broadcast lists, ensuring seamless interaction between all stakeholders in the Dr. Plant ecosystem.
+1. Primary Responsibilities
+A. User Discovery & Social Initiation
+* User Search: Allows users to search for peers, experts, or buyers by name, username, or role to initiate new conversations.
+* Presence Tracking: Manages real-time "Online" status and "Last Seen" timestamps using a dedicated heartbeat mechanism.
+B. Rich Messaging (Direct & Group)
+* Instant Delivery: Real-time text, voice notes, and media delivery via Firestore.
+* Message Interactions: Supports message replies (threading), emoji reactions, and message unsending (deletion).
+* Group Conversations: Supports multi-user rooms with administrative controls (adding/removing participants, changing group avatars).
+C. Broadcast System
+* One-to-Many Messaging: Allows Farmers or Experts to send a single broadcast message to multiple recipients (e.g., all followers or a specific group of buyers) without creating a permanent group chat.
+* Delivery Status: Tracks which recipients have received and opened broadcasted content.
+D. Media & Unified Inbox
+* Shared Gallery: Organizes all images, videos, and files shared in a chat into a "Shared Media" view.
+* Inbox Management: Supports archiving, muting notifications for specific chats, and pinning important conversations to the top.
+2. Master Entity Definitions
+2.1 Firebase Firestore (Real-time Layer)
+* Collection: chat_rooms
+   * { id, is_group: boolean, participants: [userIds], admins: [userIds], metadata: {name, avatar}, last_message: {text, sender_id, timestamp}, updated_at }
+* Collection: messages (Sub-collection of chat_rooms/{roomId}/messages)
+   * { id, sender_id, text, type: "TEXT"|"IMAGE"|"VOICE"|"VIDEO"|"FILE", reactions: {emoji: [userIds]}, reply_to_id: UUID, attachment_url, is_seen: boolean, timestamp }
+* Collection: presence
+   * { user_id, status: "ONLINE"|"OFFLINE", last_seen: timestamp }
+* Collection: broadcasts
+   * { id, sender_id, recipient_ids: [], content: {}, sent_at, status: "SENDING"|"COMPLETED" }
+2.2 Neon PostgreSQL (Relationship & Archive Layer)
+* Entity: UserSettings
+   * user_id: UUID (PK)
+   * blocked_users: UUID[]
+   * muted_rooms: UUID[]
+   * allow_dms_from: Enum { EVERYONE, FOLLOWED_ONLY }
+* Entity: MessageArchive (For regulatory compliance/auditing)
+   * id: UUID (PK)
+   * room_id: UUID
+   * message_body: Text
+   * sent_at: Timestamp
+3. Data Transfer Objects (DTOs)
+UserSearchDTO
+* query: String (Name or Username)
+* role_filter: Enum { FARMER, EXPERT, BUYER }
+* limit: Integer
+BroadcastCreateDTO
+* recipient_ids: UUID[]
+* content: String
+* attachment_url: String (Optional)
+MessageReactionDTO
+* message_id: String
+* emoji: String
+* action: Enum { ADD, REMOVE }
+4. Detailed Endpoint Specs
+4.1 Discovery & Presence
+* GET /api/v1/chat/search-users: Queries the User Service directory to find people to message.
+* GET /api/v1/chat/presence/{userId}: Fetches the current online status and "last seen" of a specific user.
+* POST /api/v1/chat/heartbeat: Updates the authenticated user's presence to ONLINE.
+4.2 Messaging & Rooms
+* POST /api/v1/chat/initiate:
+   * Logic: Creates a 1:1 or Group room. For 1:1, it checks if a room already exists to prevent duplicates.
+* POST /api/v1/chat/rooms/{id}/react: Adds or removes an emoji reaction to a specific message.
+* DELETE /api/v1/chat/messages/{id}: "Unsend" logic. Removes the message for all participants if deleted within a specific time window.
+4.3 Broadcast System
+* POST /api/v1/chat/broadcast:
+   * Logic: 1. Validates recipient list.
+2. Spawns background tasks to deliver individual messages to the DMs of all recipients.
+3. Logs the broadcast event for tracking.
+5. Operational Logic & Constraints
+A. The "Seen" Logic
+   * When a user opens a chat room, a batch update is sent to Firestore to mark all messages where sender_id != current_user as is_seen: true. This triggers the "Seen" indicator for the sender.
+B. Broadcast Throttling
+   * To prevent spam, the service enforces a limit (e.g., 500 recipients per broadcast) and a cooldown period for non-verified accounts.
+C. Privacy & Blocking
+   * DM Gating: If a user’s allow_dms_from is set to FOLLOWED_ONLY, the service checks the Community Service follow-graph before allowing room initiation.
+   * Blocking: If User A blocks User B, the service prevents User B from initiating chats or sending messages to User A.
+D. Real-time Synchronization
+   * Push Notifications: Integrates with FCM (Firebase Cloud Messaging). If a message is sent to a user whose presence is OFFLINE, a high-priority push notification is dispatched containing the message snippet.

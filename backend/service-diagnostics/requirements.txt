@@ -1,0 +1,9 @@
+fastapi
+sqlalchemy
+asyncpg
+firebase-admin
+httpx
+ultralytics
+numpy
+opencv-python-headless
+uvicorn
