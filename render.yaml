@@ -36,35 +36,17 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.0
       - key: SERVICE_USERS_URL
-        fromService:
-          name: service-users
-          type: web
-          property: url
+        value: https://service-users-hj9u.onrender.com
       - key: SERVICE_FARMS_URL
-        fromService:
-          name: service-farms
-          type: web
-          property: url
+        value: https://service-farms-hj9u.onrender.com
       - key: SERVICE_MARKETPLACE_URL
-        fromService:
-          name: service-marketplace
-          type: web
-          property: url
+        value: https://service-marketplace-hj9u.onrender.com
       - key: SERVICE_COMMUNITY_URL
-        fromService:
-          name: service-community
-          type: web
-          property: url
+        value: https://service-community-hj9u.onrender.com
       - key: SERVICE_CHAT_URL
-        fromService:
-          name: service-chat
-          type: web
-          property: url
+        value: https://service-chat-hj9u.onrender.com
       - key: SERVICE_DIAGNOSTICS_URL
-        fromService:
-          name: service-diagnostics
-          type: web
-          property: url
+        value: https://service-diagnostics-hj9u.onrender.com
       - fromGroup: project-secrets
 
   - type: web
