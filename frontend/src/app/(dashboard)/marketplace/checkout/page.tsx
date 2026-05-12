@@ -100,7 +100,8 @@ export default function CheckoutPage() {
         })),
         total_price: finalTotal,
         payment_method: paymentMethod,
-        shipping_address: useManual ? manualAddress : (selectedFarm ? selectedFarm.name : "Default Address")
+        shipping_address: useManual ? manualAddress : (selectedFarm ? selectedFarm.name : "Default Address"),
+        buyer_name: (user as any)?.full_name || "Guest User"
       });
       clearCart();
       setStep(3);
@@ -121,6 +122,57 @@ export default function CheckoutPage() {
       </div>
 
       <div className="space-y-3 p-3">
+        {/* Section 0: Cart Items */}
+        <div className="bg-white p-4 rounded-xl shadow-sm space-y-4">
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center justify-between">
+            0. Items in Cart
+          </h3>
+          <div className="space-y-4">
+            {items.map((item) => (
+              <div key={item.id} className="flex items-center gap-4 group">
+                <div className="w-16 h-16 rounded-xl bg-gray-50 flex-shrink-0 flex items-center justify-center overflow-hidden border border-gray-100">
+                  {item.image ? (
+                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-2xl">📦</span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-black text-gray-900 truncate">{item.name}</p>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">₹{item.price}/{item.unit}</p>
+                  
+                  <div className="mt-2 flex items-center gap-3">
+                    <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-100">
+                      <button 
+                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors font-bold"
+                      >
+                        -
+                      </button>
+                      <span className="w-8 text-center text-xs font-black text-gray-900">{item.quantity}</span>
+                      <button 
+                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        className="w-7 h-7 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors font-bold"
+                      >
+                        +
+                      </button>
+                    </div>
+                    <button 
+                      onClick={() => removeFromCart(item.id)}
+                      className="text-[10px] font-black uppercase tracking-widest text-red-500 hover:text-red-600 px-2"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-gray-900">₹{(item.price * item.quantity).toLocaleString()}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Section 1: Address */}
         <div className="bg-white p-4 rounded-xl shadow-sm space-y-4">
           <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center justify-between">

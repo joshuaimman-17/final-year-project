@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from pydantic import BaseModel, ConfigDict, Field
 from decimal import Decimal
 
@@ -35,8 +35,9 @@ class OrderItemBase(BaseModel):
 
 class OrderCreate(BaseModel):
     items: List[OrderItemBase]
-    shipping_address: Dict[str, str] # {street, city, state, zip}
-    payment_method_id: str
+    shipping_address: Union[str, Dict[str, str]] # Allow both string and structured address
+    payment_method: str
+    buyer_name: Optional[str] = None
 
 class OrderItemRead(OrderItemBase):
     id: uuid.UUID
@@ -51,7 +52,8 @@ class OrderRead(BaseModel):
     total_amount: Decimal
     platform_fee: Decimal
     status: str
-    shipping_address: Dict[str, str]
+    shipping_address: Union[str, Dict[str, str]]
+    buyer_name: Optional[str] = None
     created_at: datetime
     items: List[OrderItemRead]
     

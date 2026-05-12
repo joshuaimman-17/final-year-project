@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { adminService } from "@/services";
 import { PlatformStat } from "@/types";
 
@@ -62,13 +63,26 @@ export default function AdminDashboardPage() {
       <div className="space-y-4">
         <h3 className="font-bold text-gray-900 text-lg px-1">Management Queues</h3>
         <div className="space-y-3">
-           <button className="w-full bg-gray-900 text-white p-6 rounded-[2rem] flex justify-between items-center group active:scale-98 transition-transform shadow-xl shadow-gray-200">
-              <div className="text-left">
+           <Link 
+            href="/admin/users"
+            className="w-full bg-white text-gray-900 border border-gray-100 p-6 rounded-[2rem] flex justify-between items-center group active:scale-98 transition-transform shadow-sm text-left"
+           >
+              <div>
+                 <div className="font-bold mb-1">User Management</div>
+                 <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Platform Directory</div>
+              </div>
+              <span className="text-xl group-hover:translate-x-2 transition-transform">➔</span>
+           </Link>
+           <Link 
+            href="/admin/experts"
+            className="w-full bg-gray-900 text-white p-6 rounded-[2rem] flex justify-between items-center group active:scale-98 transition-transform shadow-xl shadow-gray-200 text-left"
+           >
+              <div>
                  <div className="font-bold mb-1">Expert Approvals</div>
                  <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Pending Applications</div>
               </div>
               <span className="text-xl group-hover:translate-x-2 transition-transform">➔</span>
-           </button>
+           </Link>
            <button className="w-full bg-white text-gray-900 border border-gray-100 p-6 rounded-[2rem] flex justify-between items-center group active:scale-98 transition-transform shadow-sm">
               <div className="text-left">
                  <div className="font-bold mb-1">Content Moderation</div>

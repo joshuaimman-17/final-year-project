@@ -34,3 +34,17 @@ async def toggle_user_status(
     db: AsyncSession = Depends(get_db)
 ):
     return await UserController.toggle_status(id, db)
+
+@router.get("/", response_model=List[UserRead])
+async def list_all_users(
+    decoded_token: dict = Depends(check_role("ADMIN")), 
+    db: AsyncSession = Depends(get_db)
+):
+    return await UserController.list_users(db)
+
+@router.get("/stats")
+async def get_platform_stats(
+    decoded_token: dict = Depends(check_role("ADMIN")), 
+    db: AsyncSession = Depends(get_db)
+):
+    return await UserController.get_stats(db)

@@ -11,7 +11,21 @@ from api.schemas.marketplace import ListingCreate, ListingRead
 
 router = APIRouter()
 
-def _firebase_uid_to_uuid(uid: str) -> uuid.UUID:
+def _get_user_id(token: dict) -> uuid.UUID:
+    """
+    Returns the Postgres User UUID. 
+    Prioritizes 'db_id' from custom claims. 
+    Falls back to hashing the Firebase UID for legacy items.
+    """
+    db_id = token.get("db_id")
+    if db_id:
+        try:
+            return uuid.UUID(db_id)
+        except ValueError:
+            pass
+    
+    # Legacy fallback
+    uid = token.get("uid")
     return uuid.UUID(hashlib.md5(uid.encode()).hexdigest())
 
 @router.post("/listings", response_model=ListingRead)
@@ -21,7 +35,7 @@ async def create_listing(
     token: dict = Depends(verify_token)
 ):
     """Creates a new agricultural listing."""
-    user_id = _firebase_uid_to_uuid(token["uid"])
+    user_id = _get_user_id(token)
     
     listing = Listing(
         farmer_id=user_id,

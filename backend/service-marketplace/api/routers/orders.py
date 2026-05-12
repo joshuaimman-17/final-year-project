@@ -14,7 +14,21 @@ from api.schemas.marketplace import OrderCreate, OrderRead
 
 router = APIRouter()
 
-def _firebase_uid_to_uuid(uid: str) -> uuid.UUID:
+def _get_user_id(token: dict) -> uuid.UUID:
+    """
+    Returns the Postgres User UUID. 
+    Prioritizes 'db_id' from custom claims. 
+    Falls back to hashing the Firebase UID for legacy items.
+    """
+    db_id = token.get("db_id")
+    if db_id:
+        try:
+            return uuid.UUID(db_id)
+        except ValueError:
+            pass
+    
+    # Legacy fallback
+    uid = token.get("uid")
     return uuid.UUID(hashlib.md5(uid.encode()).hexdigest())
 
 @router.post("/orders", response_model=OrderRead)
@@ -30,7 +44,7 @@ async def create_order(
     2. Atomic decrement of inventory.
     3. Create Order and OrderItems.
     """
-    buyer_id = _firebase_uid_to_uuid(token["uid"])
+    buyer_id = _get_user_id(token)
     
     total_amount = Decimal("0.00")
     order_items = []
@@ -71,6 +85,7 @@ async def create_order(
     
     new_order = Order(
         buyer_id=buyer_id,
+        buyer_name=payload.buyer_name,
         seller_id=seller_id,
         total_amount=total_amount,
         platform_fee=platform_fee,
@@ -87,17 +102,48 @@ async def create_order(
     result = await db.execute(select(Order).options(selectinload(Order.items)).where(Order.id == new_order.id))
     return result.scalars().first()
 
+@router.get("/orders/seller", response_model=List[OrderRead])
+async def get_seller_orders(
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_token)
+):
+    """Retrieve orders where the current user is the seller."""
+    user_id = _get_user_id(token)
+    legacy_id = uuid.UUID(hashlib.md5(token["uid"].encode()).hexdigest())
+    
+    result = await db.execute(
+        select(Order)
+        .options(selectinload(Order.items))
+        .where((Order.seller_id == user_id) | (Order.seller_id == legacy_id))
+        .order_by(Order.created_at.desc())
+    )
+    orders = result.scalars().all()
+    
+    # Normalize IDs for the frontend
+    for o in orders:
+        if o.seller_id == legacy_id:
+            o.seller_id = user_id
+            
+    return orders
+
 @router.get("/orders/history", response_model=List[OrderRead])
 async def get_order_history(
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(verify_token)
 ):
     """Retrieve order history for the current user (as buyer or seller)."""
-    user_id = _firebase_uid_to_uuid(token["uid"])
+    user_id = _get_user_id(token)
+    legacy_id = uuid.UUID(hashlib.md5(token["uid"].encode()).hexdigest())
+    
     result = await db.execute(
         select(Order)
         .options(selectinload(Order.items))
-        .where((Order.buyer_id == user_id) | (Order.seller_id == user_id))
+        .where(
+            (Order.buyer_id == user_id) | 
+            (Order.seller_id == user_id) |
+            (Order.buyer_id == legacy_id) |
+            (Order.seller_id == legacy_id)
+        )
         .order_by(Order.created_at.desc())
     )
     return result.scalars().all()

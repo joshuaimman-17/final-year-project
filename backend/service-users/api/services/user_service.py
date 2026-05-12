@@ -49,7 +49,7 @@ class UserService:
                 password=user_in.password,
                 display_name=user_in.full_name
             )
-            # Set custom claims for role
+            # Set custom claims (will update after DB sync)
             auth.set_custom_user_claims(fb_user.uid, {"role": user_in.role})
             firebase_uid = fb_user.uid
         except Exception as e:
@@ -68,7 +68,11 @@ class UserService:
         await db.commit()
         await db.refresh(new_user)
 
-        # 3. Sync to Firestore
+        # 3. Update claims with real DB ID
+        auth.set_custom_user_claims(firebase_uid, {
+            "role": new_user.role,
+            "db_id": str(new_user.id)
+        })
         await UserService.sync_user_to_firestore(new_user)
 
         # 4. Get JWT
@@ -89,7 +93,11 @@ class UserService:
         if not db_user:
             raise HTTPException(status_code=404, detail="User not found in database")
         
-        # Update last active
+        # Update claims and last active
+        auth.set_custom_user_claims(db_user.firebase_uid, {
+            "role": db_user.role,
+            "db_id": str(db_user.id)
+        })
         db_user.last_active_at = datetime.utcnow()
         await db.commit()
 
@@ -298,4 +306,32 @@ class UserService:
                 error_msg = resp.json().get("error", {}).get("message", "Authentication failed")
                 raise HTTPException(status_code=401, detail=f"Authentication failed: {error_msg}")
             return resp.json()
+
+    @staticmethod
+    async def get_all_users(db: AsyncSession):
+        result = await db.execute(select(User).order_by(User.created_at.desc()))
+        return result.scalars().all()
+
+    @staticmethod
+    async def get_platform_stats(db: AsyncSession):
+        from sqlalchemy import func
+        
+        # 1. Total Farmers
+        farmers_count = await db.scalar(select(func.count(User.id)).where(User.role == UserRole.FARMER))
+        
+        # 2. Total Experts
+        experts_count = await db.scalar(select(func.count(User.id)).where(User.role == UserRole.EXPERT))
+        
+        # 3. Pending Expert Applications
+        pending_experts = await db.scalar(select(func.count(ExpertProfile.user_id)).where(ExpertProfile.verification_status == VerificationStatus.PENDING))
+        
+        # 4. Total Users
+        total_users = await db.scalar(select(func.count(User.id)))
+        
+        return [
+            {"label": "Total Farmers", "value": f"{farmers_count:,}", "change": "+0%", "icon": "👨‍🌾"},
+            {"label": "Total Experts", "value": f"{experts_count:,}", "change": "+0%", "icon": "🎓"},
+            {"label": "Pending Apps", "value": str(pending_experts), "change": "Urgent" if pending_experts > 0 else "None", "icon": "📑"},
+            {"label": "Total Users", "value": f"{total_users:,}", "change": "Platform", "icon": "👥"}
+        ]
 

@@ -27,6 +27,11 @@ export const marketplaceService = {
     return response.data;
   },
 
+  async getSellerOrders(): Promise<Order[]> {
+    const response = await apiClient.get("/marketplace/orders/seller");
+    return response.data;
+  },
+
   async updateOrderStatus(orderId: string, status: string): Promise<any> {
     const response = await apiClient.patch(`/marketplace/orders/${orderId}/status`, status, {
       headers: { "Content-Type": "application/json" }

@@ -26,6 +26,7 @@ import { AuthProvider } from "../context/auth-context";
 import { CartProvider } from "../context/cart-context";
 import Navbar from "../components/layout/Navbar";
 import SubNavbar from "../components/layout/SubNavbar";
+import CartFooter from "../components/layout/CartFooter";
 
 export default function RootLayout({
   children,
@@ -42,9 +43,10 @@ export default function RootLayout({
           <CartProvider>
             <Navbar />
             <SubNavbar />
-            <div className="pt-[104px]">
+            <div className="pt-[104px] pb-24">
               {children}
             </div>
+            <CartFooter />
           </CartProvider>
         </AuthProvider>
       </body>

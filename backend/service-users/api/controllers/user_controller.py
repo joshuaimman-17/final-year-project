@@ -89,3 +89,12 @@ class UserController:
     async def toggle_status(user_id: uuid.UUID, db: AsyncSession):
         return await UserService.toggle_user_status(user_id, db)
 
+    @staticmethod
+    async def list_users(db: AsyncSession):
+        users = await UserService.get_all_users(db)
+        return [UserRead.model_validate(u) for u in users]
+
+    @staticmethod
+    async def get_stats(db: AsyncSession):
+        return await UserService.get_platform_stats(db)
+

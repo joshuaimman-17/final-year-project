@@ -55,6 +55,7 @@ class Order(Base):
 
     id               = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     buyer_id         = Column(UUID(as_uuid=True), nullable=False, index=True)
+    buyer_name       = Column(String, nullable=True) # Cached for easy display
     seller_id        = Column(UUID(as_uuid=True), nullable=False, index=True)
     total_amount     = Column(Numeric(12, 2), nullable=False)
     platform_fee     = Column(Numeric(10, 2), nullable=False)

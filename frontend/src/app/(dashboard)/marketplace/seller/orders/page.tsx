@@ -17,9 +17,7 @@ export default function FarmerOrdersPage() {
   useEffect(() => {
     const fetchOrders = async () => {
       try {
-        const history = await marketplaceService.getOrderHistory();
-        // Filter orders where the current user is the seller
-        const sellerOrders = history.filter(order => order.seller_id === user?.id);
+        const sellerOrders = await marketplaceService.getSellerOrders();
         setOrders(sellerOrders);
       } catch (err) {
         console.error("Failed to fetch orders:", err);
@@ -86,34 +84,63 @@ export default function FarmerOrdersPage() {
       ) : (
         <div className="space-y-4">
           {orders.map((order) => (
-            <div key={order.id} className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 space-y-4">
-              <div className="flex justify-between items-start">
+            <div key={order.id} className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-gray-100/50 border border-gray-100 space-y-6 relative overflow-hidden group">
+              {/* Background Accent */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-gray-50 rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-110"></div>
+              
+              <div className="flex justify-between items-start relative z-10">
                 <div>
-                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Order ID</div>
-                  <div className="font-bold text-gray-900 text-sm truncate w-32">{order.id}</div>
+                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Order Identifier</div>
+                  <div className="font-bold text-gray-900 text-sm">#{order.id.slice(0, 8)}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Earned</div>
-                  <div className="text-lg font-black text-green-600">₹{order.total_amount.toLocaleString()}</div>
+                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Earnings</div>
+                  <div className="text-xl font-black text-green-600">₹{order.total_amount.toLocaleString()}</div>
                 </div>
               </div>
 
-              <div className="border-t border-gray-50 pt-4">
-                <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Shipping Details</div>
-                <p className="text-sm font-medium text-gray-700">
+              <div className="grid grid-cols-2 gap-8 relative z-10">
+                <div>
+                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Customer</div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-blue-100 flex items-center justify-center text-sm font-black text-blue-600 border border-blue-200">
+                      {(order as any).buyer_name?.[0] || "U"}
+                    </div>
+                    <div>
+                      <p className="text-sm font-black text-gray-900">{(order as any).buyer_name || "Unknown Buyer"}</p>
+                      <p className="text-[10px] text-gray-400 font-bold">Verified Buyer</p>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">Order Summary</div>
+                  <p className="text-sm font-black text-gray-900">
+                    {order.items.length} {order.items.length === 1 ? 'Product' : 'Products'}
+                  </p>
+                  <p className="text-[10px] text-gray-500 font-bold">
+                    {order.items.reduce((acc, item) => acc + item.quantity, 0)} Units Total
+                  </p>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-50 pt-6 relative z-10">
+                <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                  📍 Delivery Destination
+                </div>
+                <p className="text-sm font-medium text-gray-600 leading-relaxed">
                   {typeof order.shipping_address === 'string' 
                     ? order.shipping_address 
                     : JSON.stringify(order.shipping_address)}
                 </p>
               </div>
 
-              <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center justify-between pt-2 relative z-10">
                 <div>
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
-                    order.status === 'PLACED' ? 'bg-blue-50 text-blue-600' :
-                    order.status === 'SHIPPED' ? 'bg-orange-50 text-orange-600' :
-                    order.status === 'DELIVERED' ? 'bg-green-50 text-green-600' :
-                    'bg-gray-50 text-gray-500'
+                  <span className={`px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border ${
+                    order.status === 'PLACED' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                    order.status === 'SHIPPED' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                    order.status === 'DELIVERED' ? 'bg-green-50 text-green-600 border-green-100' :
+                    'bg-gray-50 text-gray-500 border-gray-100'
                   }`}>
                     {order.status}
                   </span>
@@ -123,9 +150,9 @@ export default function FarmerOrdersPage() {
                   <button
                     onClick={() => handleUpdateStatus(order.id, 'SHIPPED')}
                     disabled={updatingId === order.id}
-                    className="bg-gray-900 text-white px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest active:scale-95 transition-transform disabled:opacity-50"
+                    className="bg-gray-900 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-xl shadow-gray-200 hover:bg-black disabled:opacity-50"
                   >
-                    {updatingId === order.id ? "Packing..." : "Pack & Ship"}
+                    {updatingId === order.id ? "Packing..." : "Mark as Shipped"}
                   </button>
                 )}
               </div>

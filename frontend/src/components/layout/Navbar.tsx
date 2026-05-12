@@ -35,13 +35,61 @@ const Navbar = () => {
 
           {/* User Info or Auth Links */}
           {user ? (
-            <div className="flex items-center gap-3">
-              <div className="text-right">
-                <p className="text-xs font-bold text-gray-900 leading-none">{user.full_name}</p>
-                <p className="text-[9px] font-black uppercase tracking-widest text-green-600 mt-0.5">{user.role}</p>
-              </div>
-              <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center text-xs font-black shadow-md shadow-green-100">
-                {user.full_name[0].toUpperCase()}
+            <div className="relative group">
+              <button 
+                className="flex items-center gap-3 hover:bg-gray-50 p-1.5 rounded-2xl transition-all active:scale-95"
+              >
+                <div className="text-right hidden sm:block">
+                  <p className="text-xs font-bold text-gray-900 leading-none">{user.full_name}</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-green-600 mt-0.5">{user.role}</p>
+                </div>
+                <div className="w-9 h-9 rounded-full bg-green-600 text-white flex items-center justify-center text-xs font-black shadow-lg shadow-green-100 border-2 border-white">
+                  {user.full_name[0].toUpperCase()}
+                </div>
+              </button>
+
+              {/* Dropdown Menu */}
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-3xl shadow-2xl shadow-gray-200 border border-gray-50 py-3 px-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all transform scale-95 group-hover:scale-100 z-[100]">
+                <div className="px-3 py-3 border-b border-gray-50 mb-2">
+                  <p className="text-xs font-black text-gray-900">{user.full_name}</p>
+                  <p className="text-[10px] text-gray-400 font-bold truncate">{user.email}</p>
+                </div>
+                
+                <Link 
+                  href="/profile" 
+                  className="flex items-center gap-3 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-2xl transition-all"
+                >
+                  <span className="text-base">👤</span>
+                  My Profile
+                </Link>
+                
+                {user.role === "ADMIN" && (
+                  <Link 
+                    href="/admin" 
+                    className="flex items-center gap-3 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-purple-600 hover:bg-purple-50 rounded-2xl transition-all"
+                  >
+                    <span className="text-base">🛡️</span>
+                    Admin Hub
+                  </Link>
+                )}
+
+                <Link 
+                  href="/settings" 
+                  className="flex items-center gap-3 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-2xl transition-all"
+                >
+                  <span className="text-base">⚙️</span>
+                  Settings
+                </Link>
+
+                <div className="h-px bg-gray-50 my-2"></div>
+
+                <button 
+                  onClick={logout}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 rounded-2xl transition-all"
+                >
+                  <span className="text-base">🚪</span>
+                  Logout
+                </button>
               </div>
             </div>
           ) : (
