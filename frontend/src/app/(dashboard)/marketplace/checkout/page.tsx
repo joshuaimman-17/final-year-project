@@ -2,10 +2,12 @@
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useCart } from "@/context/cart-context";
+import { useAuth } from "@/context/auth-context";
 import { marketplaceService, farmService } from "@/services";
 
 export default function CheckoutPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const { items, totalAmount, updateQuantity, removeFromCart, clearCart } = useCart();
   const [step, setStep] = useState(1);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
