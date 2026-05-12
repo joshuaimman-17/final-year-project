@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../../context/auth-context";
 import { UserRole } from "../../types/user";
@@ -9,6 +9,18 @@ import { NAVIGATION_CONFIG } from "../../config/navigation";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const filteredMainItems = NAVIGATION_CONFIG.filter((item) => {
     if (item.hideIfAuthenticated && user) return false;
@@ -35,8 +47,9 @@ const Navbar = () => {
 
           {/* User Info or Auth Links */}
           {user ? (
-            <div className="relative group">
+            <div className="relative" ref={dropdownRef}>
               <button 
+                onClick={() => setIsProfileOpen(!isProfileOpen)}
                 className="flex items-center gap-3 hover:bg-gray-50 p-1.5 rounded-2xl transition-all active:scale-95"
               >
                 <div className="text-right hidden sm:block">
@@ -49,7 +62,7 @@ const Navbar = () => {
               </button>
 
               {/* Dropdown Menu */}
-              <div className="absolute right-0 mt-2 w-56 bg-white rounded-3xl shadow-2xl shadow-gray-200 border border-gray-50 py-3 px-2 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all transform scale-95 group-hover:scale-100 z-[100]">
+              <div className={`absolute right-0 mt-2 w-56 bg-white rounded-3xl shadow-2xl shadow-gray-200 border border-gray-50 py-3 px-2 transition-all transform z-[100] ${isProfileOpen ? 'visible opacity-100 scale-100' : 'invisible opacity-0 scale-95'}`}>
                 <div className="px-3 py-3 border-b border-gray-50 mb-2">
                   <p className="text-xs font-black text-gray-900">{user.full_name}</p>
                   <p className="text-[10px] text-gray-400 font-bold truncate">{user.email}</p>
@@ -57,6 +70,7 @@ const Navbar = () => {
                 
                 <Link 
                   href="/profile" 
+                  onClick={() => setIsProfileOpen(false)}
                   className="flex items-center gap-3 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-2xl transition-all"
                 >
                   <span className="text-base">👤</span>
@@ -66,6 +80,7 @@ const Navbar = () => {
                 {user.role === "ADMIN" && (
                   <Link 
                     href="/admin" 
+                    onClick={() => setIsProfileOpen(false)}
                     className="flex items-center gap-3 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-purple-600 hover:bg-purple-50 rounded-2xl transition-all"
                   >
                     <span className="text-base">🛡️</span>
@@ -75,6 +90,7 @@ const Navbar = () => {
 
                 <Link 
                   href="/settings" 
+                  onClick={() => setIsProfileOpen(false)}
                   className="flex items-center gap-3 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-2xl transition-all"
                 >
                   <span className="text-base">⚙️</span>
@@ -84,7 +100,10 @@ const Navbar = () => {
                 <div className="h-px bg-gray-50 my-2"></div>
 
                 <button 
-                  onClick={logout}
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    logout();
+                  }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 text-[11px] font-black uppercase tracking-widest text-red-500 hover:bg-red-50 rounded-2xl transition-all"
                 >
                   <span className="text-base">🚪</span>
